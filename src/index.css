@@ -1,42 +1,51 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Poppins:wght@300;400;500;600&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+/* GlamFind Design System - Pastel & Beige Theme
 All colors MUST be HSL.
 */
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* GlamFind Pastel & Beige Color Palette */
+    --background: 48 67% 98%; /* #FDFBF5 - Cream white */
+    --foreground: 16 69% 20%; /* #5D4037 - Dark brown */
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card: 48 67% 98%; /* #FDFBF5 */
+    --card-foreground: 16 69% 20%; /* #5D4037 */
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover: 48 67% 98%; /* #FDFBF5 */
+    --popover-foreground: 16 69% 20%; /* #5D4037 */
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 29 29% 59%; /* #D2B48C - Tan/Beige */
+    --primary-foreground: 48 67% 98%; /* #FDFBF5 */
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 29 45% 82%; /* #E6C8B4 - Light beige */
+    --secondary-foreground: 16 69% 20%; /* #5D4037 */
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 29 45% 90%; /* Lighter beige */
+    --muted-foreground: 16 35% 45%; /* Medium brown */
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 29 45% 82%; /* #E6C8B4 */
+    --accent-foreground: 16 69% 20%; /* #5D4037 */
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 48 67% 98%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 29 35% 85%; /* Light beige border */
+    --input: 29 35% 85%;
+    --ring: 29 29% 59%; /* Primary color for focus rings */
 
     --radius: 0.5rem;
+
+    /* GlamFind specific colors */
+    --glam-tan: 29 29% 59%; /* #D2B48C */
+    --glam-cream: 48 67% 98%; /* #FDFBF5 */
+    --glam-beige: 29 45% 82%; /* #E6C8B4 */
+    --glam-brown: 16 69% 20%; /* #5D4037 */
 
     --sidebar-background: 0 0% 98%;
 
@@ -101,5 +110,20 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+    font-family: 'Poppins', sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Playfair Display', serif;
+  }
+}
+
+@layer components {
+  .font-heading {
+    font-family: 'Playfair Display', serif;
+  }
+  
+  .font-body {
+    font-family: 'Poppins', sans-serif;
   }
 }
