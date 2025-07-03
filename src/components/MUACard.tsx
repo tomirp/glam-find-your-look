@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Star, MapPin, Heart } from "lucide-react";
 
 interface MUACardProps {
+  id?: string;
   name: string;
   rating: number;
   reviews: number;
@@ -16,6 +17,7 @@ interface MUACardProps {
 }
 
 const MUACard = ({ 
+  id,
   name, 
   rating, 
   reviews, 

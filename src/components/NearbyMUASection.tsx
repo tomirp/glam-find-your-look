@@ -1,8 +1,10 @@
+import { Link } from "react-router-dom";
 import MUACard from "./MUACard";
 
 const NearbyMUASection = () => {
   const nearbyMUAs = [
     {
+      id: "1",
       name: "Sarah Makeup Artist",
       rating: 4.8,
       reviews: 127,
@@ -12,6 +14,7 @@ const NearbyMUASection = () => {
       price: "Rp 300.000"
     },
     {
+      id: "2",
       name: "Maya Beauty Studio",
       rating: 4.9,
       reviews: 89,
@@ -21,6 +24,7 @@ const NearbyMUASection = () => {
       price: "Rp 250.000"
     },
     {
+      id: "3",
       name: "Dinda MUA",
       rating: 4.7,
       reviews: 156,
@@ -30,6 +34,7 @@ const NearbyMUASection = () => {
       price: "Rp 200.000"
     },
     {
+      id: "4",
       name: "Rika Professional",
       rating: 4.9,
       reviews: 203,
@@ -48,8 +53,10 @@ const NearbyMUASection = () => {
         </h2>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {nearbyMUAs.map((mua, index) => (
-            <MUACard key={index} {...mua} />
+          {nearbyMUAs.map((mua) => (
+            <Link key={mua.id} to={`/mua/${mua.id}`}>
+              <MUACard {...mua} />
+            </Link>
           ))}
         </div>
       </div>

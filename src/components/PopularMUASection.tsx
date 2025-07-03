@@ -1,8 +1,10 @@
+import { Link } from "react-router-dom";
 import MUACard from "./MUACard";
 
 const PopularMUASection = () => {
   const popularMUAs = [
     {
+      id: "5",
       name: "Luna Beauty Expert",
       rating: 5.0,
       reviews: 342,
@@ -13,6 +15,7 @@ const PopularMUASection = () => {
       isPopular: true
     },
     {
+      id: "6",
       name: "Aesthetic by Vina",
       rating: 4.9,
       reviews: 289,
@@ -23,6 +26,7 @@ const PopularMUASection = () => {
       isPopular: true
     },
     {
+      id: "7",
       name: "Glam Studio Jakarta",
       rating: 4.8,
       reviews: 445,
@@ -33,6 +37,7 @@ const PopularMUASection = () => {
       isPopular: true
     },
     {
+      id: "8",
       name: "Beauty by Andira",
       rating: 4.9,
       reviews: 178,
@@ -52,8 +57,10 @@ const PopularMUASection = () => {
         </h2>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {popularMUAs.map((mua, index) => (
-            <MUACard key={index} {...mua} />
+          {popularMUAs.map((mua) => (
+            <Link key={mua.id} to={`/mua/${mua.id}`}>
+              <MUACard {...mua} />
+            </Link>
           ))}
         </div>
       </div>

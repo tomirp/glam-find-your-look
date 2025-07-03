@@ -1,10 +1,12 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, MapPin } from "lucide-react";
 
 const SearchSection = () => {
+  const navigate = useNavigate();
   const [selectedLocation, setSelectedLocation] = useState("Jakarta Selatan");
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -49,7 +51,12 @@ const SearchSection = () => {
           {/* Search Button */}
           <Button 
             className="px-8 py-3 bg-primary hover:bg-primary/90 text-primary-foreground"
-            onClick={() => console.log("Search:", searchQuery, "Location:", selectedLocation)}
+            onClick={() => {
+              const params = new URLSearchParams();
+              if (searchQuery) params.set("query", searchQuery);
+              params.set("location", selectedLocation);
+              navigate(`/search?${params.toString()}`);
+            }}
           >
             Cari
           </Button>
