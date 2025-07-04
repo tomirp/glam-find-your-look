@@ -13,7 +13,7 @@ interface AuthContextType {
     userType: 'customer' | 'mua';
     phone?: string;
   }) => Promise<{ error: any }>;
-  signOut: () => Promise<{ error: any }>;
+  signOut: () => Promise<{ error: any; }>; // Tipe sudah benar di sini
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -32,72 +32,74 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [role, setRole] = useState<'customer' | 'mua' | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const fetchUserRole = async (user: User | null) => {
+    if (!user) {
+      setRole(null);
+      setLoading(false);
+      return null;
+    }
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('user_type')
+        .eq('user_id', user.id)
+        .single();
+      if (error) throw error;
+      return data.user_type;
+    } catch (e) {
+      console.error("Gagal mengambil peran pengguna:", e);
+      return null;
+    }
+  };
+  
   useEffect(() => {
-    const fetchUserRole = async (user: User | null) => {
-      if (!user) {
-        setRole(null);
-        setLoading(false);
-        return;
+    setLoading(true);
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      setSession(session);
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
+      if (currentUser) {
+        const userRole = await fetchUserRole(currentUser);
+        setRole(userRole);
       }
-      
-      // --- PERUBAHAN UTAMA DIMULAI DI SINI ---
-      // Ambil data peran langsung dari tabel 'profiles' di database.
-      try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('user_type')
-          .eq('user_id', user.id)
-          .single();
-
-        if (error) {
-          console.error("Error fetching user role:", error);
-          setRole(null);
-        } else if (data) {
-          setRole(data.user_type); // Set peran berdasarkan data dari database
-        }
-      } catch (e) {
-        console.error("Exception fetching user role:", e);
-        setRole(null);
-      } finally {
-        setLoading(false);
-      }
-      // --- PERUBAHAN UTAMA SELESAI ---
-    };
+      setLoading(false);
+    });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      async (_event, session) => {
         setSession(session);
         const currentUser = session?.user ?? null;
         setUser(currentUser);
-        // Panggil fungsi untuk mengambil peran setiap kali state auth berubah
-        fetchUserRole(currentUser);
+        if (currentUser) {
+          const userRole = await fetchUserRole(currentUser);
+          setRole(userRole);
+        } else {
+          setRole(null);
+        }
+        setLoading(false);
       }
     );
-
-    // Jalankan juga saat pertama kali aplikasi dimuat
-    supabase.auth.getSession().then(({ data: { session } }) => {
-        setSession(session);
-        const currentUser = session?.user ?? null;
-        setUser(currentUser);
-        fetchUserRole(currentUser);
-    });
 
     return () => subscription.unsubscribe();
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    // Fungsi signIn tidak perlu diubah
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    return { error };
+    setLoading(true);
+    const { data: loginData, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error || !loginData.user) {
+      setLoading(false);
+      return { error };
+    }
+    const userRole = await fetchUserRole(loginData.user);
+    setUser(loginData.user);
+    setSession(loginData.session);
+    setRole(userRole);
+    setLoading(false);
+    return { error: null };
   };
 
-  const signUp = async (email: string, password: string, userData: {
-    fullName: string; userType: 'customer' | 'mua'; phone?: string;
-  }) => {
-    // Fungsi signUp tidak perlu diubah
+  const signUp = async (email: string, password: string, userData: { fullName: string; userType: 'customer' | 'mua'; phone?: string; }) => {
+    // ... (Fungsi signUp tetap sama)
     const redirectUrl = `${window.location.origin}/`;
     const { data, error } = await supabase.auth.signUp({
       email, password, options: { emailRedirectTo: redirectUrl, data: {
@@ -113,15 +115,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return { error };
   };
 
+  // --- PERBAIKAN UTAMA DI SINI ---
   const signOut = async () => {
+    setLoading(true);
     const { error } = await supabase.auth.signOut();
     setUser(null);
     setSession(null);
     setRole(null);
-    return { error };
+    setLoading(false);
+    return { error }; // <-- Mengembalikan objek dengan properti 'error'
   };
 
-  const value = { user, session, role, loading, signIn, signUp, signOut };
+  const value = { user, session, role, loading, signIn, signUp, signOut }; // <-- Disederhanakan
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
