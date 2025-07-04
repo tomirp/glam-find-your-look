@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { 
   DropdownMenu, 
@@ -7,10 +6,14 @@ import {
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
 import { User, ChevronDown } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
 
 const Navbar = () => {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [userName] = useState("Sarah");
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
 
   return (
     <nav className="sticky top-0 z-50 bg-background border-b border-border shadow-sm">
@@ -42,22 +45,25 @@ const Navbar = () => {
               <Button variant="ghost" className="flex items-center space-x-2">
                 <User className="w-5 h-5" />
                 <span className="hidden sm:inline">
-                  {isLoggedIn ? `Hello, ${userName}` : "Akun"}
+                  {user ? "Akun Saya" : "Akun"}
                 </span>
                 <ChevronDown className="w-4 h-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
-              {!isLoggedIn ? (
+              {!user ? (
                 <>
                   <DropdownMenuItem 
-                    onClick={() => setIsLoggedIn(true)}
+                    onClick={() => navigate("/auth")}
                     className="cursor-pointer"
                   >
-                    Sign In
+                    Masuk
                   </DropdownMenuItem>
-                  <DropdownMenuItem className="cursor-pointer">
-                    Sign Up
+                  <DropdownMenuItem 
+                    onClick={() => navigate("/auth")}
+                    className="cursor-pointer"
+                  >
+                    Daftar
                   </DropdownMenuItem>
                 </>
               ) : (
@@ -69,10 +75,25 @@ const Navbar = () => {
                     Pesanan Saya
                   </DropdownMenuItem>
                   <DropdownMenuItem 
-                    onClick={() => setIsLoggedIn(false)}
+                    onClick={async () => {
+                      const { error } = await signOut();
+                      if (error) {
+                        toast({
+                          title: "Error",
+                          description: error.message,
+                          variant: "destructive",
+                        });
+                      } else {
+                        toast({
+                          title: "Berhasil",
+                          description: "Anda berhasil keluar.",
+                        });
+                        navigate("/");
+                      }
+                    }}
                     className="cursor-pointer text-destructive"
                   >
-                    Logout
+                    Keluar
                   </DropdownMenuItem>
                 </>
               )}

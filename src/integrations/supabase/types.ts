@@ -9,7 +9,354 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      bookings: {
+        Row: {
+          booking_date: string
+          booking_time: string
+          created_at: string
+          customer_id: string
+          customer_notes: string | null
+          id: string
+          mua_notes: string | null
+          mua_profile_id: string
+          service_id: string
+          status: Database["public"]["Enums"]["booking_status"] | null
+          total_price: number
+          updated_at: string
+        }
+        Insert: {
+          booking_date: string
+          booking_time: string
+          created_at?: string
+          customer_id: string
+          customer_notes?: string | null
+          id?: string
+          mua_notes?: string | null
+          mua_profile_id: string
+          service_id: string
+          status?: Database["public"]["Enums"]["booking_status"] | null
+          total_price: number
+          updated_at?: string
+        }
+        Update: {
+          booking_date?: string
+          booking_time?: string
+          created_at?: string
+          customer_id?: string
+          customer_notes?: string | null
+          id?: string
+          mua_notes?: string | null
+          mua_profile_id?: string
+          service_id?: string
+          status?: Database["public"]["Enums"]["booking_status"] | null
+          total_price?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bookings_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_mua_profile_id_fkey"
+            columns: ["mua_profile_id"]
+            isOneToOne: false
+            referencedRelation: "mua_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mua_profiles: {
+        Row: {
+          bank_account_name: string | null
+          bank_account_number: string | null
+          bank_name: string | null
+          business_name: string | null
+          created_at: string
+          experience_years: number | null
+          id: string
+          instagram_url: string | null
+          is_available: boolean | null
+          location_address: string | null
+          location_city: string
+          portfolio_images: string[] | null
+          price_range: string | null
+          profile_id: string
+          rating: number | null
+          specializations: string[] | null
+          total_bookings: number | null
+          total_reviews: number | null
+          updated_at: string
+          whatsapp_number: string | null
+        }
+        Insert: {
+          bank_account_name?: string | null
+          bank_account_number?: string | null
+          bank_name?: string | null
+          business_name?: string | null
+          created_at?: string
+          experience_years?: number | null
+          id?: string
+          instagram_url?: string | null
+          is_available?: boolean | null
+          location_address?: string | null
+          location_city: string
+          portfolio_images?: string[] | null
+          price_range?: string | null
+          profile_id: string
+          rating?: number | null
+          specializations?: string[] | null
+          total_bookings?: number | null
+          total_reviews?: number | null
+          updated_at?: string
+          whatsapp_number?: string | null
+        }
+        Update: {
+          bank_account_name?: string | null
+          bank_account_number?: string | null
+          bank_name?: string | null
+          business_name?: string | null
+          created_at?: string
+          experience_years?: number | null
+          id?: string
+          instagram_url?: string | null
+          is_available?: boolean | null
+          location_address?: string | null
+          location_city?: string
+          portfolio_images?: string[] | null
+          price_range?: string | null
+          profile_id?: string
+          rating?: number | null
+          specializations?: string[] | null
+          total_bookings?: number | null
+          total_reviews?: number | null
+          updated_at?: string
+          whatsapp_number?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mua_profiles_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payments: {
+        Row: {
+          amount: number
+          booking_id: string
+          created_at: string
+          customer_id: string
+          id: string
+          paid_at: string | null
+          payment_method: string | null
+          payment_provider: string | null
+          payment_status: Database["public"]["Enums"]["payment_status"] | null
+          transaction_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          booking_id: string
+          created_at?: string
+          customer_id: string
+          id?: string
+          paid_at?: string | null
+          payment_method?: string | null
+          payment_provider?: string | null
+          payment_status?: Database["public"]["Enums"]["payment_status"] | null
+          transaction_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          booking_id?: string
+          created_at?: string
+          customer_id?: string
+          id?: string
+          paid_at?: string | null
+          payment_method?: string | null
+          payment_provider?: string | null
+          payment_status?: Database["public"]["Enums"]["payment_status"] | null
+          transaction_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: true
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          address: string | null
+          avatar_url: string | null
+          bio: string | null
+          created_at: string
+          full_name: string
+          id: string
+          is_verified: boolean | null
+          phone: string | null
+          updated_at: string
+          user_id: string
+          user_type: Database["public"]["Enums"]["user_type"]
+        }
+        Insert: {
+          address?: string | null
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string
+          full_name: string
+          id?: string
+          is_verified?: boolean | null
+          phone?: string | null
+          updated_at?: string
+          user_id: string
+          user_type: Database["public"]["Enums"]["user_type"]
+        }
+        Update: {
+          address?: string | null
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string
+          full_name?: string
+          id?: string
+          is_verified?: boolean | null
+          phone?: string | null
+          updated_at?: string
+          user_id?: string
+          user_type?: Database["public"]["Enums"]["user_type"]
+        }
+        Relationships: []
+      }
+      reviews: {
+        Row: {
+          booking_id: string
+          created_at: string
+          customer_id: string
+          id: string
+          mua_profile_id: string
+          rating: number
+          review_images: string[] | null
+          review_text: string | null
+          updated_at: string
+        }
+        Insert: {
+          booking_id: string
+          created_at?: string
+          customer_id: string
+          id?: string
+          mua_profile_id: string
+          rating: number
+          review_images?: string[] | null
+          review_text?: string | null
+          updated_at?: string
+        }
+        Update: {
+          booking_id?: string
+          created_at?: string
+          customer_id?: string
+          id?: string
+          mua_profile_id?: string
+          rating?: number
+          review_images?: string[] | null
+          review_text?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reviews_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: true
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_mua_profile_id_fkey"
+            columns: ["mua_profile_id"]
+            isOneToOne: false
+            referencedRelation: "mua_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      services: {
+        Row: {
+          created_at: string
+          description: string | null
+          duration_minutes: number | null
+          id: string
+          is_active: boolean | null
+          mua_profile_id: string
+          name: string
+          price_max: number | null
+          price_min: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          duration_minutes?: number | null
+          id?: string
+          is_active?: boolean | null
+          mua_profile_id: string
+          name: string
+          price_max?: number | null
+          price_min: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          duration_minutes?: number | null
+          id?: string
+          is_active?: boolean | null
+          mua_profile_id?: string
+          name?: string
+          price_max?: number | null
+          price_min?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "services_mua_profile_id_fkey"
+            columns: ["mua_profile_id"]
+            isOneToOne: false
+            referencedRelation: "mua_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -18,7 +365,14 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      booking_status:
+        | "pending"
+        | "accepted"
+        | "rejected"
+        | "completed"
+        | "cancelled"
+      payment_status: "pending" | "paid" | "refunded" | "failed"
+      user_type: "customer" | "mua"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -133,6 +487,16 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      booking_status: [
+        "pending",
+        "accepted",
+        "rejected",
+        "completed",
+        "cancelled",
+      ],
+      payment_status: ["pending", "paid", "refunded", "failed"],
+      user_type: ["customer", "mua"],
+    },
   },
 } as const
