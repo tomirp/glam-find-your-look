@@ -12,6 +12,8 @@ import Payment from "./pages/Payment";
 import Confirmation from "./pages/Confirmation";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
+import MUADashboard from "./pages/MUADashboard"; // <-- 1. IMPORT HALAMAN BARU
+import ProtectedRoute from "./components/ProtectedRoute"; // <--2. SEBAGAI RUTE TERPROTEKSI
 
 const queryClient = new QueryClient();
 
@@ -26,6 +28,7 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/search" element={<SearchResults />} />
+            <Route path="/mua/dashboard" element={<MUADashboard />} /> {/* <-- 2. TAMBAHKAN RUTE BARU */}
             <Route path="/mua/:id" element={<MUADetail />} />
             <Route path="/checkout" element={<Checkout />} />
             <Route path="/payment" element={<Payment />} />
