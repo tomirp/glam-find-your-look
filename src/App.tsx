@@ -14,7 +14,9 @@ import Confirmation from "./pages/Confirmation";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import MUAProfile from "./pages/MUAProfile";
+import CustomerProfile from "./pages/CustomerProfile";
 import ProtectedRoute from "./components/ProtectedRoute";
+import CustomerProtectedRoute from "./components/CustomerProtectedRoute";
 
 const queryClient = new QueryClient();
 
@@ -31,6 +33,9 @@ const App = () => (
             <Route path="/search" element={<SearchResults />} />
             <Route element={<ProtectedRoute />}>
               <Route path="/mua/profile" element={<MUAProfile />} />
+            </Route>
+            <Route element={<CustomerProtectedRoute />}>
+              <Route path="/customer/profile" element={<CustomerProfile />} />
             </Route>
             <Route path="/mua/:id" element={<MUADetail />} />
             <Route path="/checkout" element={<Checkout />} />

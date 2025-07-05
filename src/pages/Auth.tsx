@@ -32,7 +32,7 @@ const Auth = () => {
         navigate('/mua/profile');
       } else if (role === 'customer') {
         toast({ title: "Berhasil!", description: "Anda berhasil masuk." });
-        navigate('/');
+        navigate('/customer/profile');
       }
     }
   }, [user, role, authLoading, navigate, toast]);
