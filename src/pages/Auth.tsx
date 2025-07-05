@@ -26,7 +26,10 @@ const Auth = () => {
   });
 
   useEffect(() => {
-    if (!authLoading && user) {
+    console.log("Auth page - User:", user?.email, "Role:", role, "Loading:", authLoading);
+    
+    if (!authLoading && user && role) {
+      console.log("Redirecting user based on role:", role);
       if (role === 'mua') {
         toast({ title: "Berhasil!", description: "Anda masuk sebagai MUA." });
         navigate('/mua/profile');
@@ -37,11 +40,29 @@ const Auth = () => {
     }
   }, [user, role, authLoading, navigate, toast]);
 
+  // Add dummy account helper
+  const fillDummyMUA = () => {
+    setLoginData({
+      email: "mua.test@example.com",
+      password: "password123"
+    });
+  };
+
+  const fillDummyCustomer = () => {
+    setLoginData({
+      email: "customer.test@example.com", 
+      password: "password123"
+    });
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log("Login form submitted with:", loginData.email);
     setLoading(true);
+    
     const { error } = await signIn(loginData.email, loginData.password);
     if (error) {
+      console.error("Login failed:", error);
       toast({ title: "Error", description: error.message, variant: "destructive" });
     }
     setLoading(false);
@@ -87,6 +108,22 @@ const Auth = () => {
             <h1 className="text-3xl font-bold text-primary font-heading mb-2">GlamFind</h1>
             <p className="text-muted-foreground">Platform terpercaya untuk layanan makeup artist</p>
         </div>
+        
+        {/* Dummy Account Helper */}
+        <Card className="mb-4">
+          <CardContent className="p-4">
+            <p className="text-sm text-muted-foreground mb-2">Akun Testing:</p>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={fillDummyMUA}>
+                MUA Test
+              </Button>
+              <Button variant="outline" size="sm" onClick={fillDummyCustomer}>
+                Customer Test
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
         <Card>
             <CardHeader className="text-center">
                 <CardTitle>Masuk ke Akun Anda</CardTitle>
