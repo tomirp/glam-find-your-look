@@ -15,7 +15,7 @@ const Auth = () => {
   const { signIn, signUp, user, role, loading: authLoading } = useAuth();
   const { toast } = useToast();
   
-  const [activeTab, setActiveTab] = useState("login"); // <-- PENAMBAHAN: State untuk mengontrol tab
+  const [activeTab, setActiveTab] = useState("login");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   
@@ -29,7 +29,7 @@ const Auth = () => {
     if (!authLoading && user) {
       if (role === 'mua') {
         toast({ title: "Berhasil!", description: "Anda masuk sebagai MUA." });
-        navigate('/mua/dashboard');
+        navigate('/mua/profile');
       } else if (role === 'customer') {
         toast({ title: "Berhasil!", description: "Anda berhasil masuk." });
         navigate('/');
@@ -47,7 +47,6 @@ const Auth = () => {
     setLoading(false);
   };
 
-  // --- PERUBAHAN UTAMA DI SINI ---
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -72,7 +71,6 @@ const Auth = () => {
         title: "Pendaftaran Berhasil!",
         description: "Silakan periksa email untuk verifikasi dan masuk ke akun Anda.",
       });
-      // Pindahkan pengguna ke tab login secara otomatis
       setActiveTab("login"); 
     }
     setLoading(false);
@@ -95,7 +93,6 @@ const Auth = () => {
                 <CardDescription>Masuk atau daftar untuk melanjutkan</CardDescription>
             </CardHeader>
             <CardContent>
-                {/* --- PERUBAHAN UTAMA DI SINI --- */}
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                     <TabsList className="grid w-full grid-cols-2">
                         <TabsTrigger value="login">Masuk</TabsTrigger>
@@ -103,7 +100,6 @@ const Auth = () => {
                     </TabsList>
                     <TabsContent value="login">
                         <form onSubmit={handleLogin} className="space-y-4">
-                            {/* Form Login tetap sama */}
                             <div className="space-y-2">
                                 <Label htmlFor="email">Email</Label>
                                 <Input id="email" type="email" placeholder="nama@email.com" value={loginData.email} onChange={(e) => setLoginData({ ...loginData, email: e.target.value })} required />
@@ -124,7 +120,6 @@ const Auth = () => {
                     </TabsContent>
                     <TabsContent value="register">
                         <form onSubmit={handleRegister} className="space-y-4">
-                            {/* Form Registrasi tetap sama */}
                             <div className="space-y-2">
                                 <Label htmlFor="userType">Jenis Akun</Label>
                                 <RadioGroup value={registerData.userType} onValueChange={(value) => setRegisterData({ ...registerData, userType: value as "customer" | "mua" })} className="flex flex-row space-x-6">

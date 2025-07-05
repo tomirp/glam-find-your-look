@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -12,8 +13,8 @@ import Payment from "./pages/Payment";
 import Confirmation from "./pages/Confirmation";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
-import MUADashboard from "./pages/MUADashboard"; // <-- 1. IMPORT HALAMAN BARU
-import ProtectedRoute from "./components/ProtectedRoute"; // <--2. SEBAGAI RUTE TERPROTEKSI
+import MUAProfile from "./pages/MUAProfile";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 const queryClient = new QueryClient();
 
@@ -28,12 +29,13 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/search" element={<SearchResults />} />
-            <Route path="/mua/dashboard" element={<MUADashboard />} /> {/* <-- 2. TAMBAHKAN RUTE BARU */}
+            <Route element={<ProtectedRoute />}>
+              <Route path="/mua/profile" element={<MUAProfile />} />
+            </Route>
             <Route path="/mua/:id" element={<MUADetail />} />
             <Route path="/checkout" element={<Checkout />} />
             <Route path="/payment" element={<Payment />} />
             <Route path="/confirmation" element={<Confirmation />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

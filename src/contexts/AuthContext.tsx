@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,7 +14,7 @@ interface AuthContextType {
     userType: 'customer' | 'mua';
     phone?: string;
   }) => Promise<{ error: any }>;
-  signOut: () => Promise<{ error: any; }>; // Tipe sudah benar di sini
+  signOut: () => Promise<{ error: any; }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -99,7 +100,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signUp = async (email: string, password: string, userData: { fullName: string; userType: 'customer' | 'mua'; phone?: string; }) => {
-    // ... (Fungsi signUp tetap sama)
     const redirectUrl = `${window.location.origin}/`;
     const { data, error } = await supabase.auth.signUp({
       email, password, options: { emailRedirectTo: redirectUrl, data: {
@@ -115,7 +115,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return { error };
   };
 
-  // --- PERBAIKAN UTAMA DI SINI ---
   const signOut = async () => {
     setLoading(true);
     const { error } = await supabase.auth.signOut();
@@ -123,10 +122,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setSession(null);
     setRole(null);
     setLoading(false);
-    return { error }; // <-- Mengembalikan objek dengan properti 'error'
+    return { error };
   };
 
-  const value = { user, session, role, loading, signIn, signUp, signOut }; // <-- Disederhanakan
+  const value = { user, session, role, loading, signIn, signUp, signOut };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
