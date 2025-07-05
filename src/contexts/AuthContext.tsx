@@ -2,8 +2,6 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { User, Session } from "@supabase/supabase-js";
-// --- PERBAIKAN ---
-// Path import yang benar sesuai struktur folder Anda
 import { supabase } from "@/integrations/supabase/client";
 
 interface AuthContextType {
@@ -36,65 +34,61 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [role, setRole] = useState<'customer' | 'mua' | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchUserRole = async (user: User | null) => {
-    if (!user) {
-      console.log("No user provided to fetchUserRole");
-      setRole(null);
-      return null;
-    }
-    try {
-      console.log("Fetching user role for user:", user.id);
-      // Mengambil data dari tabel 'profiles' dimana 'user_id' sama dengan id user yang login
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('user_type')
-        .eq('user_id', user.id)
-        .single();
+  useEffect(() => {
+    const fetchSessionAndRole = async () => {
+      console.log("Mulai mengambil sesi...");
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
-      if (error) {
-        console.error("Error fetching user role:", error);
-        throw error;
+      if (sessionError) {
+        console.error("Error mengambil sesi:", sessionError);
+        setLoading(false);
+        return;
       }
       
-      const userRole = data?.user_type || null;
-      console.log("User role fetched:", userRole);
-      setRole(userRole);
-      return userRole;
-    } catch (e) {
-      console.error("Gagal mengambil peran pengguna:", e);
-      setRole(null);
-      return null;
-    }
-  };
-  
-  useEffect(() => {
-    setLoading(true);
-    
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       const currentUser = session?.user ?? null;
       setUser(currentUser);
-      
-      if (currentUser) {
-        await fetchUserRole(currentUser);
-      }
-      setLoading(false);
-    });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        setSession(session);
-        const currentUser = session?.user ?? null;
-        setUser(currentUser);
-        
-        // Atur loading kembali ke true saat state berubah untuk mengambil role
-        setLoading(true);
-        if (currentUser) {
-          await fetchUserRole(currentUser);
-        } else {
+      if (currentUser) {
+        console.log("Sesi ditemukan untuk:", currentUser.email);
+        try {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('user_type')
+            .eq('user_id', currentUser.id)
+            .single();
+
+          if (error) {
+            console.error("Gagal mengambil peran pengguna:", error.message);
+            throw error;
+          }
+
+          if (data) {
+            console.log("Peran pengguna ditemukan:", data.user_type);
+            setRole(data.user_type);
+          } else {
+            console.warn("Profil tidak ditemukan untuk user:", currentUser.id);
+            setRole(null);
+          }
+        } catch (e) {
           setRole(null);
         }
-        setLoading(false);
+      } else {
+        console.log("Tidak ada sesi aktif.");
+        setRole(null);
+      }
+      // Pastikan loading selesai di semua skenario
+      setLoading(false);
+      console.log("Proses autentikasi awal selesai.");
+    };
+
+    fetchSessionAndRole();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        console.log("Status Auth berubah, event:", _event);
+        // Panggil kembali fungsi utama untuk memuat ulang semua data jika ada perubahan
+        fetchSessionAndRole();
       }
     );
 
@@ -103,53 +97,56 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signIn = async (email: string, password: string) => {
     setLoading(true);
-    const { data: loginData, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (!error && loginData.user) {
-      await fetchUserRole(loginData.user);
-    }
-    setLoading(false);
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    // `onAuthStateChange` akan menangani sisanya, kita hanya perlu menunggu loading selesai.
     return { error };
   };
 
   const signUp = async (email: string, password: string, userData: { fullName: string; userType: 'customer' | 'mua'; phone?: string; }) => {
+    // PENTING: Supabase sekarang merekomendasikan menyimpan data tambahan di 'options.data'
     const { data, error } = await supabase.auth.signUp({
-      email, password
+      email, password,
+      options: {
+        data: {
+          full_name: userData.fullName,
+          user_type: userData.userType,
+          phone: userData.phone
+        }
+      }
     });
 
-    // Jika user berhasil dibuat, langsung insert ke tabel profiles
-    if (!error && data.user) {
-      console.log("User created, creating profile for:", data.user.id);
-      const { error: profileError } = await supabase.from('profiles').insert({
-          user_id: data.user.id,
-          full_name: userData.fullName,
-          user_type: userData.userType, // Pastikan nama kolom benar: 'user_type'
-          phone: userData.phone,
-      });
-      if (profileError) { 
-        console.error('Error creating profile:', profileError);
-        // Mungkin perlu menghapus user yang baru dibuat jika profil gagal dibuat
-        return { error: profileError };
-      } else {
-        console.log("Profile created successfully");
-      }
+    if (error) {
+      return { error };
     }
-    return { error };
+    
+    // Kita tidak perlu insert manual lagi jika menggunakan `options.data` DAN
+    // Anda memiliki trigger di database yang memindahkan data dari `auth.users.raw_user_meta_data` ke tabel `profiles`.
+    // Jika tidak ada trigger, insert manual masih diperlukan. Anggap saja kita tetap insert manual untuk keamanan.
+    if (data.user) {
+        const { error: profileError } = await supabase.from('profiles').insert({
+            user_id: data.user.id,
+            full_name: userData.fullName,
+            user_type: userData.userType,
+            phone: userData.phone,
+        });
+        if (profileError) return { error: profileError };
+    }
+
+    return { error: null };
   };
 
   const signOut = async () => {
+    setLoading(true); // Mulai loading saat proses logout
     const { error } = await supabase.auth.signOut();
-    setUser(null);
-    setSession(null);
-    setRole(null);
+    // `onAuthStateChange` akan mendeteksi logout dan membersihkan state.
     return { error };
   };
 
   const value = { user, session, role, loading, signIn, signUp, signOut };
 
-  // Menahan render children sampai loading selesai
   return (
     <AuthContext.Provider value={value}>
-        {children}
+      {children}
     </AuthContext.Provider>
   );
 };
