@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -13,13 +12,11 @@ import { Eye, EyeOff, ArrowLeft } from "lucide-react";
 
 const Auth = () => {
   const navigate = useNavigate();
-  // Perhatikan: `loading` di sini kita sebut `authLoading` untuk membedakan
   const { signIn, signUp, user, role, loading: authLoading } = useAuth();
   const { toast } = useToast();
   
   const [activeTab, setActiveTab] = useState("login");
-  // State loading lokal untuk proses di halaman ini
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   
   const [loginData, setLoginData] = useState({ email: "", password: "" });
@@ -28,68 +25,39 @@ const Auth = () => {
     userType: "customer" as "customer" | "mua",
   });
 
-  // --- PERBAIKAN UTAMA ADA DI SINI ---
   useEffect(() => {
-    // Jangan lakukan apa-apa jika AuthContext masih dalam proses loading
-    if (authLoading) {
-      return;
-    }
-
-    // Hanya redirect jika user dan role sudah BENAR-BENAR ada
-    if (user && role) {
-      console.log("Redirecting user based on role:", role);
+    if (!authLoading && user && role) {
       if (role === 'mua') {
-        toast({ title: "Berhasil!", description: "Anda masuk sebagai MUA." });
-        navigate('/mua/profile', { replace: true });
+        navigate('/mua/profile');
       } else if (role === 'customer') {
-        toast({ title: "Berhasil!", description: "Anda berhasil masuk." });
-        navigate('/customer/profile', { replace: true });
+        navigate('/customer/profile');
       }
     }
-    
-    // Bergantung pada user, role, dan authLoading untuk dieksekusi ulang
-  }, [user, role, authLoading, navigate, toast]);
+  }, [user, role, authLoading, navigate]);
 
-  // Add dummy account helper
-  const fillDummyMUA = () => {
-    setLoginData({
-      email: "mua.test@example.com",
-      password: "password123"
-    });
-  };
-
-  const fillDummyCustomer = () => {
-    setLoginData({
-      email: "customer.test@example.com", 
-      password: "password123"
-    });
-  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Login form submitted with:", loginData.email);
-    setIsProcessing(true);
+    setLoading(true);
     
     const { error } = await signIn(loginData.email, loginData.password);
     if (error) {
-      console.error("Login failed:", error);
       toast({ title: "Error", description: error.message, variant: "destructive" });
-      setIsProcessing(false); // Pastikan state processing berhenti jika error
     }
-    // Tidak perlu setIsProcessing(false) di sini, biarkan useEffect yang menangani redirect
+    setLoading(false);
   };
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsProcessing(true);
+    setLoading(true);
 
     if (registerData.password !== registerData.confirmPassword) {
       toast({ title: "Error", description: "Password tidak cocok", variant: "destructive" });
-      setIsProcessing(false); return;
+      setLoading(false); return;
     }
     if (registerData.password.length < 6) {
       toast({ title: "Error", description: "Password minimal 6 karakter", variant: "destructive" });
-      setIsProcessing(false); return;
+      setLoading(false); return;
     }
 
     const { error } = await signUp(registerData.email, registerData.password, {
@@ -105,11 +73,8 @@ const Auth = () => {
       });
       setActiveTab("login"); 
     }
-    setIsProcessing(false);
+    setLoading(false);
   };
-
-  // Logika untuk menonaktifkan tombol
-  const isButtonDisabled = isProcessing || authLoading;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20 flex items-center justify-center p-4">
@@ -123,20 +88,7 @@ const Auth = () => {
             <p className="text-muted-foreground">Platform terpercaya untuk layanan makeup artist</p>
         </div>
         
-        {/* Dummy Account Helper */}
-        <Card className="mb-4">
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground mb-2">Akun Testing:</p>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={fillDummyMUA}>
-                MUA Test
-              </Button>
-              <Button variant="outline" size="sm" onClick={fillDummyCustomer}>
-                Customer Test
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        {/* BAGIAN AKUN TESTING SUDAH DIHAPUS DARI SINI */}
 
         <Card>
             <CardHeader className="text-center">
@@ -164,8 +116,8 @@ const Auth = () => {
                                     </Button>
                                 </div>
                             </div>
-                            <Button type="submit" className="w-full" disabled={isButtonDisabled}>
-                                {isButtonDisabled ? "Memproses..." : "Masuk"}
+                            <Button type="submit" className="w-full" disabled={loading || authLoading}>
+                                {loading || authLoading ? "Memproses..." : "Masuk"}
                             </Button>
                         </form>
                     </TabsContent>
@@ -201,7 +153,7 @@ const Auth = () => {
                                 <div className="relative">
                                 <Input id="registerPassword" type={showPassword ? "text" : "password"} placeholder="Minimal 6 karakter" value={registerData.password} onChange={(e) => setRegisterData({ ...registerData, password: e.target.value })} required />
                                 <Button type="button" variant="ghost" size="sm" className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent" onClick={() => setShowPassword(!showPassword)}>
-                                    {showPassword ? (<EyeOff className="h-4 w-4" />) : (<Eye className="h-4 w-s" />)}
+                                    {showPassword ? (<EyeOff className="h-4 w-4" />) : (<Eye className="h-4 w-4" />)}
                                 </Button>
                                 </div>
                             </div>
@@ -209,8 +161,8 @@ const Auth = () => {
                                 <Label htmlFor="confirmPassword">Konfirmasi Password</Label>
                                 <Input id="confirmPassword" type="password" placeholder="Ulangi password" value={registerData.confirmPassword} onChange={(e) => setRegisterData({ ...registerData, confirmPassword: e.target.value })} required />
                             </div>
-                            <Button type="submit" className="w-full" disabled={isButtonDisabled}>
-                                {isButtonDisabled ? "Memproses..." : "Daftar"}
+                            <Button type="submit" className="w-full" disabled={loading || authLoading}>
+                                {loading || authLoading ? "Memproses..." : "Daftar"}
                             </Button>
                         </form>
                     </TabsContent>

@@ -1,18 +1,19 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+
+// Import semua komponen UI yang kita butuhkan
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, User, Calendar, Star, Settings, Phone, Mail, MapPin } from "lucide-react";
+import { ArrowLeft, User, Calendar, Star, Settings, Save, CreditCard, Wallet, QrCode, PlusCircle, ShieldCheck } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -21,7 +22,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { DialogFooter } from "@/components/ui/dialog";
 
+// --- INTERFACE (Tipe Data) ---
 interface UserProfile {
   id: string;
   full_name: string;
@@ -34,405 +37,219 @@ interface UserProfile {
 interface Booking {
   id: string;
   booking_date: string;
-  booking_time: string;
   status: string;
   total_price: number;
-  customer_notes: string | null;
-  mua_profiles: {
-    business_name: string | null;
-    location_city: string;
-  };
-  services: {
-    name: string;
-  };
+  mua_profiles: { business_name: string | null; };
+  services: { name: string; };
+}
+
+interface Review {
+  id: string;
+  rating: number;
+  review_text: string | null;
+  created_at: string;
+  mua_profiles: { business_name: string | null; };
 }
 
 const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
-    minimumFractionDigits: 0,
-  }).format(amount);
+  return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(amount);
 };
 
+
+// --- KOMPONEN UTAMA ---
 const CustomerProfile = () => {
-  const { user, signOut } = useAuth();
+  const { user, loading: authLoading, signOut } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editForm, setEditForm] = useState({
-    full_name: "",
-    phone: "",
-    address: "",
-    bio: "",
-  });
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [pageLoading, setPageLoading] = useState(true);
 
+  // State untuk form edit
+  const [editForm, setEditForm] = useState({ full_name: "", phone: "", address: "" });
+
+  // Fungsi untuk mengambil semua data yang relevan untuk klien
+  const fetchAllData = async () => {
+    if (!user) return;
+    setPageLoading(true);
+    try {
+      // 1. Ambil data profil klien
+      const { data: profileData, error: profileError } = await supabase.from('profiles').select('*').eq('user_id', user.id).single();
+      if (profileError) throw profileError;
+      setProfile(profileData);
+      setEditForm({ full_name: profileData.full_name || '', phone: profileData.phone || '', address: profileData.address || ''});
+
+      // 2. Ambil riwayat booking klien
+      const { data: bookingsData, error: bookingError } = await supabase.from('bookings').select(`id, booking_date, status, total_price, mua_profiles(business_name), services(name)`).eq('customer_id', profileData.id).order('booking_date', { ascending: false });
+      if(bookingError) throw bookingError;
+      setBookings(bookingsData || []);
+
+      // 3. Ambil ulasan yang pernah diberikan klien
+      const { data: reviewsData, error: reviewError } = await supabase.from('reviews').select(`id, rating, review_text, created_at, mua_profiles(business_name)`).eq('customer_id', profileData.id).order('created_at', { ascending: false });
+      if(reviewError) throw reviewError;
+      setReviews(reviewsData || []);
+
+    } catch (error: any) {
+      console.error('Error fetching data:', error);
+      toast({ title: "Error", description: error.message || "Gagal memuat data profil.", variant: "destructive" });
+    } finally {
+      setPageLoading(false);
+    }
+  };
+  
+  // Ambil data saat komponen dimuat atau user berubah
   useEffect(() => {
     if (user) {
-      fetchProfileData();
+      fetchAllData();
     }
   }, [user]);
 
-  const fetchProfileData = async () => {
-    if (!user) return;
-    
-    try {
-      setLoading(true);
-      
-      // Fetch user profile
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('id, full_name, phone, avatar_url, address, bio')
-        .eq('user_id', user.id)
-        .single();
-      
-      if (profileError) throw profileError;
-      setUserProfile(profile);
-      setEditForm({
-        full_name: profile.full_name || "",
-        phone: profile.phone || "",
-        address: profile.address || "",
-        bio: profile.bio || "",
-      });
-
-      // Fetch customer bookings
-      const { data: bookingsData, error: bookingsError } = await supabase
-        .from('bookings')
-        .select(`
-          id, booking_date, booking_time, status, total_price, customer_notes,
-          mua_profiles!bookings_mua_profile_id_fkey(business_name, location_city),
-          services(name)
-        `)
-        .eq('customer_id', profile.id)
-        .order('booking_date', { ascending: false });
-
-      if (bookingsError) throw bookingsError;
-      setBookings(bookingsData || []);
-    } catch (error) {
-      console.error('Error fetching profile data:', error);
-      toast({
-        title: "Error",
-        description: "Gagal memuat data profil",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
+  // Handle logout dan redirect
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate('/', { replace: true });
     }
-  };
+  }, [user, authLoading, navigate]);
 
-  const handleUpdateProfile = async (e: React.FormEvent) => {
+  // Fungsi untuk update profil
+  const handleProfileUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!userProfile) return;
-
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          full_name: editForm.full_name,
-          phone: editForm.phone,
-          address: editForm.address,
-          bio: editForm.bio,
-        })
-        .eq('id', userProfile.id);
-
-      if (error) throw error;
-
-      setUserProfile({
-        ...userProfile,
-        full_name: editForm.full_name,
-        phone: editForm.phone,
-        address: editForm.address,
-        bio: editForm.bio,
-      });
-
-      setIsEditing(false);
-      toast({
-        title: "Berhasil",
-        description: "Profil berhasil diperbarui",
-      });
-    } catch (error) {
-      console.error('Error updating profile:', error);
-      toast({
-        title: "Error",
-        description: "Gagal memperbarui profil",
-        variant: "destructive",
-      });
+    if (!profile) return;
+    
+    setPageLoading(true);
+    const { error } = await supabase.from('profiles').update(editForm).eq('id', profile.id);
+    
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Berhasil!", description: "Profil Anda telah diperbarui." });
+      await fetchAllData(); // Muat ulang data setelah update
     }
+    setPageLoading(false);
   };
 
   const handleSignOut = async () => {
-    const { error } = await signOut();
-    if (error) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    } else {
-      navigate("/");
-    }
+    await signOut();
   };
-
-  const getStatusBadgeVariant = (status: string) => {
-    switch (status) {
-      case 'pending': return 'secondary';
-      case 'accepted': return 'default';
-      case 'completed': return 'outline';
-      case 'cancelled': return 'destructive';
-      default: return 'secondary';
-    }
-  };
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'pending': return 'Menunggu';
-      case 'accepted': return 'Diterima';
-      case 'completed': return 'Selesai';
-      case 'cancelled': return 'Dibatalkan';
-      default: return status;
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div>Memuat...</div>
-      </div>
-    );
+  
+  if (pageLoading || authLoading) {
+    return <div className="min-h-screen flex items-center justify-center"><div>Memuat Profil Anda...</div></div>;
+  }
+  
+  if (!user) {
+    return null; // Akan diarahkan oleh useEffect di atas
   }
 
+  // --- TAMPILAN JSX ---
   return (
-    <div className="min-h-screen bg-secondary/20 p-4 md:p-8">
-      <div className="container mx-auto max-w-6xl">
-        {/* Header */}
+    <div className="min-h-screen bg-background p-4 md:p-8">
+      <div className="container mx-auto max-w-4xl">
         <div className="flex items-center justify-between mb-8">
-          <Button variant="ghost" onClick={() => navigate("/")} className="flex items-center space-x-2">
-            <ArrowLeft className="h-4 w-4" />
-            <span>Kembali ke Beranda</span>
-          </Button>
-          <Button variant="outline" onClick={handleSignOut}>
-            Keluar
-          </Button>
+          <Button variant="ghost" onClick={() => navigate("/")}><ArrowLeft className="h-4 w-4 mr-2" />Kembali ke Beranda</Button>
+          <Button variant="outline" onClick={handleSignOut}>Keluar</Button>
         </div>
 
-        {/* Profile Header */}
-        <Card className="mb-8">
-          <CardContent className="p-6">
-            <div className="flex items-center space-x-4">
-              <Avatar className="h-20 w-20">
-                <AvatarImage src={userProfile?.avatar_url || ''} />
-                <AvatarFallback>
-                  <User className="h-10 w-10" />
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1">
-                <h1 className="text-2xl font-bold">{userProfile?.full_name}</h1>
-                <div className="flex items-center space-x-4 mt-2 text-sm text-muted-foreground">
-                  {userProfile?.phone && (
-                    <div className="flex items-center space-x-1">
-                      <Phone className="h-4 w-4" />
-                      <span>{userProfile.phone}</span>
-                    </div>
-                  )}
-                  <div className="flex items-center space-x-1">
-                    <Mail className="h-4 w-4" />
-                    <span>{user?.email}</span>
-                  </div>
-                  {userProfile?.address && (
-                    <div className="flex items-center space-x-1">
-                      <MapPin className="h-4 w-4" />
-                      <span>{userProfile.address}</span>
-                    </div>
-                  )}
-                </div>
-                {userProfile?.bio && (
-                  <p className="mt-2 text-sm text-muted-foreground">{userProfile.bio}</p>
-                )}
-              </div>
+        <div className="flex items-center space-x-6 mb-8">
+            <Avatar className="h-24 w-24">
+                <AvatarImage src={profile?.avatar_url || ''} />
+                <AvatarFallback className="text-3xl"><User /></AvatarFallback>
+            </Avatar>
+            <div>
+                <h1 className="text-3xl font-bold">{profile?.full_name}</h1>
+                <p className="text-muted-foreground">{user.email}</p>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Stats Cards */}
-        <div className="grid gap-4 md:grid-cols-3 mb-8">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Booking</CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{bookings.length}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Booking Selesai</CardTitle>
-              <Star className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {bookings.filter(b => b.status === 'completed').length}
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Booking Aktif</CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {bookings.filter(b => ['pending', 'accepted'].includes(b.status)).length}
-              </div>
-            </CardContent>
-          </Card>
         </div>
 
-        {/* Main Content */}
-        <Tabs defaultValue="bookings" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="bookings">Riwayat Booking</TabsTrigger>
-            <TabsTrigger value="settings">Pengaturan Profil</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="bookings">
-            <Card>
-              <CardHeader>
-                <CardTitle>Riwayat Booking</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {bookings.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-8">
-                    Belum ada riwayat booking
-                  </p>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>MUA</TableHead>
-                        <TableHead>Layanan</TableHead>
-                        <TableHead>Tanggal</TableHead>
-                        <TableHead>Harga</TableHead>
-                        <TableHead>Status</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {bookings.map((booking) => (
-                        <TableRow key={booking.id}>
-                          <TableCell className="font-medium">
-                            <div>
-                              <div>{booking.mua_profiles?.business_name || 'N/A'}</div>
-                              <div className="text-sm text-muted-foreground">
-                                {booking.mua_profiles?.location_city}
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell>{booking.services?.name || 'N/A'}</TableCell>
-                          <TableCell>
-                            {new Date(booking.booking_date).toLocaleDateString('id-ID')} {booking.booking_time}
-                          </TableCell>
-                          <TableCell>{formatCurrency(booking.total_price)}</TableCell>
-                          <TableCell>
-                            <Badge variant={getStatusBadgeVariant(booking.status)}>
-                              {getStatusText(booking.status)}
-                            </Badge>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-          
-          <TabsContent value="settings">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>Pengaturan Profil</CardTitle>
-                <Button
-                  variant={isEditing ? "outline" : "default"}
-                  onClick={() => setIsEditing(!isEditing)}
-                >
-                  <Settings className="h-4 w-4 mr-2" />
-                  {isEditing ? "Batal" : "Edit Profil"}
-                </Button>
-              </CardHeader>
-              <CardContent>
-                {isEditing ? (
-                  <form onSubmit={handleUpdateProfile} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="full_name">Nama Lengkap</Label>
-                      <Input
-                        id="full_name"
-                        value={editForm.full_name}
-                        onChange={(e) => setEditForm({...editForm, full_name: e.target.value})}
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="phone">Nomor Telepon</Label>
-                      <Input
-                        id="phone"
-                        value={editForm.phone}
-                        onChange={(e) => setEditForm({...editForm, phone: e.target.value})}
-                        placeholder="08123456789"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="address">Alamat</Label>
-                      <Input
-                        id="address"
-                        value={editForm.address}
-                        onChange={(e) => setEditForm({...editForm, address: e.target.value})}
-                        placeholder="Masukkan alamat lengkap"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="bio">Bio</Label>
-                      <Textarea
-                        id="bio"
-                        value={editForm.bio}
-                        onChange={(e) => setEditForm({...editForm, bio: e.target.value})}
-                        placeholder="Ceritakan tentang diri Anda"
-                        rows={3}
-                      />
-                    </div>
-                    <Button type="submit" className="w-full">
-                      Simpan Perubahan
-                    </Button>
-                  </form>
-                ) : (
-                  <div className="space-y-4">
-                    <div>
-                      <Label className="text-sm font-medium">Nama Lengkap</Label>
-                      <p className="text-sm text-muted-foreground">{userProfile?.full_name || 'Belum diisi'}</p>
-                    </div>
-                    <div>
-                      <Label className="text-sm font-medium">Email</Label>
-                      <p className="text-sm text-muted-foreground">{user?.email}</p>
-                    </div>
-                    <div>
-                      <Label className="text-sm font-medium">Nomor Telepon</Label>
-                      <p className="text-sm text-muted-foreground">{userProfile?.phone || 'Belum diisi'}</p>
-                    </div>
-                    <div>
-                      <Label className="text-sm font-medium">Alamat</Label>
-                      <p className="text-sm text-muted-foreground">{userProfile?.address || 'Belum diisi'}</p>
-                    </div>
-                    <div>
-                      <Label className="text-sm font-medium">Bio</Label>
-                      <p className="text-sm text-muted-foreground">{userProfile?.bio || 'Belum diisi'}</p>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
+        <Tabs defaultValue="riwayat" className="w-full">
+            <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="riwayat">Riwayat Booking</TabsTrigger>
+                <TabsTrigger value="ulasan">Ulasan Saya</TabsTrigger>
+                <TabsTrigger value="pembayaran">Metode Pembayaran</TabsTrigger>
+                <TabsTrigger value="profil">Edit Profil</TabsTrigger>
+            </TabsList>
+
+            {/* Konten Tab 1: Riwayat Booking */}
+            <TabsContent value="riwayat">
+                <Card>
+                    <CardHeader><CardTitle>Riwayat Pesanan Anda</CardTitle></CardHeader>
+                    <CardContent>
+                        <Table>
+                            <TableHeader><TableRow><TableHead>MUA</TableHead><TableHead>Layanan</TableHead><TableHead>Tanggal</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+                            <TableBody>
+                                {bookings.length > 0 ? bookings.map(booking => (
+                                    <TableRow key={booking.id}>
+                                        <TableCell>{booking.mua_profiles?.business_name || 'N/A'}</TableCell>
+                                        <TableCell>{booking.services?.name || 'N/A'}</TableCell>
+                                        <TableCell>{new Date(booking.booking_date).toLocaleDateString('id-ID')}</TableCell>
+                                        <TableCell><Badge variant={booking.status === 'completed' ? 'default' : 'secondary'}>{booking.status}</Badge></TableCell>
+                                    </TableRow>
+                                )) : <TableRow><TableCell colSpan={4} className="text-center h-24">Belum ada riwayat pesanan.</TableCell></TableRow>}
+                            </TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
+            </TabsContent>
+
+            {/* Konten Tab 2: Ulasan Saya */}
+            <TabsContent value="ulasan">
+                <Card>
+                    <CardHeader><CardTitle>Ulasan yang Telah Anda Berikan</CardTitle></CardHeader>
+                    <CardContent className="space-y-4">
+                        {reviews.length > 0 ? reviews.map(review => (
+                            <Card key={review.id} className="p-4 bg-secondary/50">
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                        <p className="font-semibold">Untuk: {review.mua_profiles?.business_name || 'N/A'}</p>
+                                        <p className="text-sm text-muted-foreground mt-1">"{review.review_text || 'Tidak ada komentar.'}"</p>
+                                    </div>
+                                    <Badge variant="outline" className="flex items-center gap-1"><Star className="h-3 w-3 text-yellow-500 fill-yellow-500" /> {review.rating}</Badge>
+                                </div>
+                            </Card>
+                        )) : <p className="text-center text-muted-foreground py-10">Anda belum memberikan ulasan apa pun.</p>}
+                    </CardContent>
+                </Card>
+            </TabsContent>
+            
+            {/* Konten Tab 3: Pembayaran */}
+            <TabsContent value="pembayaran">
+                <Card>
+                    <CardHeader>
+                      <CardTitle>Metode Pembayaran Tersimpan</CardTitle>
+                      <CardDescription>Kelola metode pembayaran untuk transaksi yang lebih cepat.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="border p-4 rounded-lg flex items-center justify-between">
+                            <div className="flex items-center gap-4"><CreditCard className="h-8 w-8 text-primary"/><div><p className="font-semibold">Kartu Kredit / Debit</p><p className="text-sm text-muted-foreground">Tidak ada kartu tersimpan</p></div></div>
+                            <Button variant="outline"><PlusCircle className="h-4 w-4 mr-2"/>Tambah Kartu</Button>
+                        </div>
+                        <div className="border p-4 rounded-lg flex items-center justify-between">
+                            <div className="flex items-center gap-4"><Wallet className="h-8 w-8 text-primary"/><div><p className="font-semibold">E-Wallet</p><p className="text-sm text-muted-foreground">GoPay, OVO, DANA, dll.</p></div></div>
+                            <Button variant="outline">Hubungkan</Button>
+                        </div>
+                        <div className="border p-4 rounded-lg flex items-center justify-between">
+                            <div className="flex items-center gap-4"><QrCode className="h-8 w-8 text-primary"/><div><p className="font-semibold">QRIS</p><p className="text-sm text-muted-foreground">Siap digunakan untuk pembayaran</p></div></div>
+                            <ShieldCheck className="h-5 w-5 text-green-500"/>
+                        </div>
+                    </CardContent>
+                </Card>
+            </TabsContent>
+
+            {/* Konten Tab 4: Edit Profil */}
+            <TabsContent value="profil">
+                 <form onSubmit={handleProfileUpdate}>
+                    <Card>
+                        <CardHeader><CardTitle>Detail Profil</CardTitle><CardDescription>Informasi ini akan digunakan untuk keperluan booking.</CardDescription></CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="space-y-2"><Label htmlFor="full_name">Nama Lengkap</Label><Input id="full_name" value={editForm.full_name} onChange={(e) => setEditForm({...editForm, full_name: e.target.value})} /></div>
+                            <div className="space-y-2"><Label htmlFor="phone">Nomor Telepon</Label><Input id="phone" value={editForm.phone} onChange={(e) => setEditForm({...editForm, phone: e.target.value})} /></div>
+                            <div className="space-y-2"><Label htmlFor="address">Alamat (Opsional)</Label><Textarea id="address" value={editForm.address} onChange={(e) => setEditForm({...editForm, address: e.target.value})} placeholder="Alamat lengkap untuk layanan di rumah..." /></div>
+                        </CardContent>
+                        <DialogFooter className="p-6 pt-0 border-t mt-6"><Button type="submit"><Save className="h-4 w-4 mr-2"/>Simpan Perubahan</Button></DialogFooter>
+                    </Card>
+                 </form>
+            </TabsContent>
         </Tabs>
       </div>
     </div>
