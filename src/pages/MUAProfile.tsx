@@ -30,6 +30,7 @@ interface MUAProfile {
 }
 
 interface UserProfile {
+  id: string;
   full_name: string;
   phone: string | null;
   avatar_url: string | null;
@@ -90,21 +91,21 @@ const MUAProfile = () => {
     try {
       setLoading(true);
       
-      // Fetch user profile
+      // Fetch user profile with id
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
-        .select('full_name, phone, avatar_url')
+        .select('id, full_name, phone, avatar_url')
         .eq('user_id', user.id)
         .single();
       
       if (profileError) throw profileError;
       setUserProfile(profile);
 
-      // Fetch MUA profile
+      // Fetch MUA profile using the profile id
       const { data: muaData, error: muaError } = await supabase
         .from('mua_profiles')
         .select('*')
-        .eq('profile_id', profile?.id || '')
+        .eq('profile_id', profile.id)
         .single();
       
       if (muaError && muaError.code !== 'PGRST116') throw muaError;
