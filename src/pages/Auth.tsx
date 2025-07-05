@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -12,11 +13,13 @@ import { Eye, EyeOff, ArrowLeft } from "lucide-react";
 
 const Auth = () => {
   const navigate = useNavigate();
+  // Perhatikan: `loading` di sini kita sebut `authLoading` untuk membedakan
   const { signIn, signUp, user, role, loading: authLoading } = useAuth();
   const { toast } = useToast();
   
   const [activeTab, setActiveTab] = useState("login");
-  const [loading, setLoading] = useState(false);
+  // State loading lokal untuk proses di halaman ini
+  const [isProcessing, setIsProcessing] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   
   const [loginData, setLoginData] = useState({ email: "", password: "" });
@@ -25,19 +28,26 @@ const Auth = () => {
     userType: "customer" as "customer" | "mua",
   });
 
+  // --- PERBAIKAN UTAMA ADA DI SINI ---
   useEffect(() => {
-    console.log("Auth page - User:", user?.email, "Role:", role, "Loading:", authLoading);
-    
-    if (!authLoading && user && role) {
+    // Jangan lakukan apa-apa jika AuthContext masih dalam proses loading
+    if (authLoading) {
+      return;
+    }
+
+    // Hanya redirect jika user dan role sudah BENAR-BENAR ada
+    if (user && role) {
       console.log("Redirecting user based on role:", role);
       if (role === 'mua') {
         toast({ title: "Berhasil!", description: "Anda masuk sebagai MUA." });
-        navigate('/mua/profile');
+        navigate('/mua/profile', { replace: true });
       } else if (role === 'customer') {
         toast({ title: "Berhasil!", description: "Anda berhasil masuk." });
-        navigate('/customer/profile');
+        navigate('/customer/profile', { replace: true });
       }
     }
+    
+    // Bergantung pada user, role, dan authLoading untuk dieksekusi ulang
   }, [user, role, authLoading, navigate, toast]);
 
   // Add dummy account helper
@@ -58,27 +68,28 @@ const Auth = () => {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     console.log("Login form submitted with:", loginData.email);
-    setLoading(true);
+    setIsProcessing(true);
     
     const { error } = await signIn(loginData.email, loginData.password);
     if (error) {
       console.error("Login failed:", error);
       toast({ title: "Error", description: error.message, variant: "destructive" });
+      setIsProcessing(false); // Pastikan state processing berhenti jika error
     }
-    setLoading(false);
+    // Tidak perlu setIsProcessing(false) di sini, biarkan useEffect yang menangani redirect
   };
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    setIsProcessing(true);
 
     if (registerData.password !== registerData.confirmPassword) {
       toast({ title: "Error", description: "Password tidak cocok", variant: "destructive" });
-      setLoading(false); return;
+      setIsProcessing(false); return;
     }
     if (registerData.password.length < 6) {
       toast({ title: "Error", description: "Password minimal 6 karakter", variant: "destructive" });
-      setLoading(false); return;
+      setIsProcessing(false); return;
     }
 
     const { error } = await signUp(registerData.email, registerData.password, {
@@ -94,8 +105,11 @@ const Auth = () => {
       });
       setActiveTab("login"); 
     }
-    setLoading(false);
+    setIsProcessing(false);
   };
+
+  // Logika untuk menonaktifkan tombol
+  const isButtonDisabled = isProcessing || authLoading;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20 flex items-center justify-center p-4">
@@ -150,8 +164,8 @@ const Auth = () => {
                                     </Button>
                                 </div>
                             </div>
-                            <Button type="submit" className="w-full" disabled={loading || authLoading}>
-                                {loading || authLoading ? "Memproses..." : "Masuk"}
+                            <Button type="submit" className="w-full" disabled={isButtonDisabled}>
+                                {isButtonDisabled ? "Memproses..." : "Masuk"}
                             </Button>
                         </form>
                     </TabsContent>
@@ -187,7 +201,7 @@ const Auth = () => {
                                 <div className="relative">
                                 <Input id="registerPassword" type={showPassword ? "text" : "password"} placeholder="Minimal 6 karakter" value={registerData.password} onChange={(e) => setRegisterData({ ...registerData, password: e.target.value })} required />
                                 <Button type="button" variant="ghost" size="sm" className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent" onClick={() => setShowPassword(!showPassword)}>
-                                    {showPassword ? (<EyeOff className="h-4 w-4" />) : (<Eye className="h-4 w-4" />)}
+                                    {showPassword ? (<EyeOff className="h-4 w-4" />) : (<Eye className="h-4 w-s" />)}
                                 </Button>
                                 </div>
                             </div>
@@ -195,8 +209,8 @@ const Auth = () => {
                                 <Label htmlFor="confirmPassword">Konfirmasi Password</Label>
                                 <Input id="confirmPassword" type="password" placeholder="Ulangi password" value={registerData.confirmPassword} onChange={(e) => setRegisterData({ ...registerData, confirmPassword: e.target.value })} required />
                             </div>
-                            <Button type="submit" className="w-full" disabled={loading || authLoading}>
-                                {loading || authLoading ? "Memproses..." : "Daftar"}
+                            <Button type="submit" className="w-full" disabled={isButtonDisabled}>
+                                {isButtonDisabled ? "Memproses..." : "Daftar"}
                             </Button>
                         </form>
                     </TabsContent>
