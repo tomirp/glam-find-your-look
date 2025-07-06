@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
-import { ArrowLeft, User, Calendar as CalendarIcon, DollarSign, Star, Settings, Save, PlusCircle, Upload } from "lucide-react";
+import { ArrowLeft, User, Star, MapPin, Phone, Instagram, Calendar as CalendarIcon, DollarSign, Settings, Save, PlusCircle, Upload, Eye, Clock, CheckCircle } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -23,8 +23,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { DialogFooter } from "@/components/ui/dialog";
-
 
 // --- INTERFACE (diperbarui untuk data baru) ---
 interface MUAProfile {
@@ -36,7 +34,7 @@ interface MUAProfile {
   total_reviews: number | null;
   total_bookings: number | null;
   is_available: boolean | null;
-  portfolio_images: string[] | null; // Untuk Portofolio Carousel
+  portfolio_images: string[] | null;
   profile_id: string;
 }
 
@@ -66,14 +64,24 @@ interface Service {
   price_max: number | null;
   duration_minutes: number | null;
   is_active: boolean | null;
-  image_url: string | null; // Untuk gambar per layanan
+  image_url: string | null;
 }
 
 const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(amount);
 };
 
-// --- KOMPONEN UTAMA ---
+const getStatusColor = (status: string) => {
+  switch (status) {
+    case 'completed': return 'bg-green-100 text-green-800';
+    case 'accepted': return 'bg-blue-100 text-blue-800';
+    case 'pending': return 'bg-yellow-100 text-yellow-800';
+    case 'rejected': return 'bg-red-100 text-red-800';
+    case 'cancelled': return 'bg-gray-100 text-gray-800';
+    default: return 'bg-gray-100 text-gray-800';
+  }
+};
+
 const MUAProfile = () => {
   const { user, loading: authLoading, signOut } = useAuth();
   const navigate = useNavigate();
@@ -114,12 +122,9 @@ const MUAProfile = () => {
         const { data: bookingsData } = await supabase.from('bookings').select(`id, booking_date, booking_time, status, total_price, customer_notes, profiles!bookings_customer_id_fkey(full_name), services(name)`).eq('mua_profile_id', muaData.id).order('booking_date', { ascending: false });
         setBookings(bookingsData || []);
 
-        // --- INI ADALAH PERBAIKAN UNTUK ERROR TYPESCRIPT ---
         const { data: servicesData, error: servicesError } = await supabase.from('services').select('id, name, price_min, price_max, duration_minutes, is_active, image_url').eq('mua_profile_id', muaData.id).order('name');
         if (servicesError) throw servicesError;
         setServices(servicesData || []);
-        
-        // Di sini Anda bisa fetch data jadwal jika sudah ada tabelnya
       }
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -137,7 +142,6 @@ const MUAProfile = () => {
     }
   }, [user, authLoading]);
 
-  // Handle Logout
   useEffect(() => {
     if (!authLoading && !user) {
       navigate('/', { replace: true });
@@ -151,7 +155,6 @@ const MUAProfile = () => {
     }
   };
 
-  // Fungsi untuk Update Profil
   const handleProfileUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userProfile) return;
@@ -169,7 +172,6 @@ const MUAProfile = () => {
     setPageLoading(false);
   };
 
-  // Fungsi untuk Upload Foto Portofolio
   const handlePortfolioUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || !user || !muaProfile) return;
@@ -193,101 +195,376 @@ const MUAProfile = () => {
   };
 
   if (pageLoading || authLoading) {
-    return <div className="min-h-screen flex items-center justify-center"><div>Memuat Profil...</div></div>;
+    return <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-pink-50"><div className="text-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div><p className="text-gray-600">Memuat Profil...</p></div></div>;
   }
   if (!user) return null;
 
-  // --- Tampilan JSX ---
   return (
-    <div className="min-h-screen bg-secondary/20 p-4 md:p-8">
-      <div className="container mx-auto max-w-6xl">
-        <div className="flex items-center justify-between mb-8">
-          <Button variant="ghost" onClick={() => navigate("/")}><ArrowLeft className="h-4 w-4 mr-2" />Kembali</Button>
-          <Button variant="outline" onClick={handleSignOut}>Keluar</Button>
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50">
+      {/* Header */}
+      <div className="bg-white shadow-sm border-b">
+        <div className="container mx-auto max-w-6xl px-4 py-4">
+          <div className="flex items-center justify-between">
+            <Button variant="ghost" onClick={() => navigate("/")} className="hover:bg-purple-50">
+              <ArrowLeft className="h-4 w-4 mr-2" />Kembali ke Beranda
+            </Button>
+            <Button variant="outline" onClick={handleSignOut} className="border-purple-200 hover:bg-purple-50">
+              Keluar
+            </Button>
+          </div>
         </div>
+      </div>
 
-        <Card className="mb-8">
-          <CardContent className="p-6">
-            <div className="flex items-center space-x-4">
-              <Avatar className="h-20 w-20"><AvatarImage src={userProfile?.avatar_url || ''} /><AvatarFallback><User className="h-10 w-10" /></AvatarFallback></Avatar>
-              <div className="flex-1">
-                <h1 className="text-2xl font-bold">{muaProfile?.business_name || userProfile?.full_name}</h1>
-                <p className="text-muted-foreground">{muaProfile?.location_city}</p>
+      <div className="container mx-auto max-w-6xl px-4 py-8">
+        {/* Profile Header Card */}
+        <Card className="mb-8 overflow-hidden border-0 shadow-lg bg-gradient-to-r from-purple-600 to-pink-600">
+          <CardContent className="p-8 text-white">
+            <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
+              <Avatar className="h-24 w-24 border-4 border-white shadow-lg">
+                <AvatarImage src={userProfile?.avatar_url || ''} />
+                <AvatarFallback className="bg-white text-purple-600 text-2xl font-bold">
+                  {userProfile?.full_name?.charAt(0) || <User className="h-12 w-12" />}
+                </AvatarFallback>
+              </Avatar>
+              
+              <div className="flex-1 space-y-2">
+                <h1 className="text-3xl font-bold">{muaProfile?.business_name || userProfile?.full_name}</h1>
+                <div className="flex flex-wrap gap-4 text-white/90">
+                  <div className="flex items-center gap-2">
+                    <MapPin className="h-4 w-4" />
+                    <span>{muaProfile?.location_city}</span>
+                  </div>
+                  {userProfile?.phone && (
+                    <div className="flex items-center gap-2">
+                      <Phone className="h-4 w-4" />
+                      <span>{userProfile.phone}</span>
+                    </div>
+                  )}
+                </div>
+                {userProfile?.bio && (
+                  <p className="text-white/90 max-w-2xl">{userProfile.bio}</p>
+                )}
+              </div>
+
+              <div className="flex flex-col md:flex-row gap-4">
+                <div className="text-center bg-white/20 rounded-lg p-4 backdrop-blur-sm">
+                  <div className="text-2xl font-bold">{muaProfile?.total_bookings || 0}</div>
+                  <div className="text-sm text-white/80">Total Booking</div>
+                </div>
+                <div className="text-center bg-white/20 rounded-lg p-4 backdrop-blur-sm">
+                  <div className="flex items-center justify-center gap-1">
+                    <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
+                    <span className="text-2xl font-bold">{muaProfile?.rating?.toFixed(1) || '0.0'}</span>
+                  </div>
+                  <div className="text-sm text-white/80">Rating</div>
+                </div>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Tabs defaultValue="ringkasan" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="ringkasan">Ringkasan</TabsTrigger>
-            <TabsTrigger value="edit_profil">Edit Profil</TabsTrigger>
-            <TabsTrigger value="layanan">Layanan & Portfolio</TabsTrigger>
-            <TabsTrigger value="jadwal">Jadwal</TabsTrigger>
-          </TabsList>
+        {/* Main Content Tabs */}
+        <Tabs defaultValue="dashboard" className="space-y-6">
+          <div className="bg-white rounded-lg shadow-sm border p-1">
+            <TabsList className="grid w-full grid-cols-4 bg-transparent">
+              <TabsTrigger value="dashboard" className="data-[state=active]:bg-purple-100 data-[state=active]:text-purple-700">
+                Dashboard
+              </TabsTrigger>
+              <TabsTrigger value="layanan" className="data-[state=active]:bg-purple-100 data-[state=active]:text-purple-700">
+                Layanan & Portfolio
+              </TabsTrigger>
+              <TabsTrigger value="edit_profil" className="data-[state=active]:bg-purple-100 data-[state=active]:text-purple-700">
+                Edit Profil
+              </TabsTrigger>
+              <TabsTrigger value="jadwal" className="data-[state=active]:bg-purple-100 data-[state=active]:text-purple-700">
+                Jadwal
+              </TabsTrigger>
+            </TabsList>
+          </div>
           
-          {/* TAB 1: RINGKASAN & ORDERAN */}
-          <TabsContent value="ringkasan">
-             <div className="grid gap-4 md:grid-cols-3 mb-8">
-              <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Total Booking</CardTitle><CalendarIcon className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{muaProfile?.total_bookings || 0}</div></CardContent></Card>
-              <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Rating</CardTitle><Star className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{muaProfile?.rating?.toFixed(1) || '0.0'}</div></CardContent></Card>
-              <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Layanan Aktif</CardTitle><DollarSign className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{services.filter(s => s.is_active).length}</div></CardContent></Card>
-            </div>
-            <Card>
-              <CardHeader><CardTitle>Pesanan Terbaru</CardTitle></CardHeader>
-              <CardContent>
-                {/* Kode Tabel Pesanan Anda di sini */}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* TAB 2: EDIT PROFIL */}
-          <TabsContent value="edit_profil">
-            <form onSubmit={handleProfileUpdate}>
-              <Card>
-                <CardHeader><CardTitle>Edit Informasi Profil</CardTitle></CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-2"><Label htmlFor="business_name">Nama Bisnis</Label><Input id="business_name" value={editForm.business_name} onChange={(e) => setEditForm({...editForm, business_name: e.target.value})} /></div>
-                      <div className="space-y-2"><Label htmlFor="full_name">Nama Lengkap</Label><Input id="full_name" value={editForm.full_name} onChange={(e) => setEditForm({...editForm, full_name: e.target.value})} /></div>
-                       <div className="space-y-2"><Label htmlFor="phone">Telepon</Label><Input id="phone" value={editForm.phone} onChange={(e) => setEditForm({...editForm, phone: e.target.value})} /></div>
-                       <div className="space-y-2"><Label htmlFor="location_city">Kota</Label><Input id="location_city" value={editForm.location_city} onChange={(e) => setEditForm({...editForm, location_city: e.target.value})} /></div>
+          {/* Dashboard Tab */}
+          <TabsContent value="dashboard" className="space-y-6">
+            {/* Stats Cards */}
+            <div className="grid gap-6 md:grid-cols-3">
+              <Card className="border-0 shadow-lg bg-gradient-to-br from-blue-50 to-blue-100">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Pesanan Bulan Ini</p>
+                      <p className="text-3xl font-bold text-blue-600">{bookings.filter(b => new Date(b.booking_date).getMonth() === new Date().getMonth()).length}</p>
+                    </div>
+                    <CalendarIcon className="h-12 w-12 text-blue-500/50" />
                   </div>
-                  <div className="space-y-2"><Label htmlFor="location_address">Alamat Lengkap</Label><Textarea id="location_address" value={editForm.location_address} onChange={(e) => setEditForm({...editForm, location_address: e.target.value})} placeholder="Jalan, nomor, kelurahan, kecamatan..."/></div>
-                  <div className="space-y-2"><Label htmlFor="bio">Bio / Deskripsi</Label><Textarea id="bio" value={editForm.bio} onChange={(e) => setEditForm({...editForm, bio: e.target.value})} placeholder="Ceritakan tentang keahlian Anda..."/></div>
-                  <div className="flex justify-end"><Button type="submit"><Save className="h-4 w-4 mr-2" />Simpan Perubahan</Button></div>
                 </CardContent>
               </Card>
-            </form>
-          </TabsContent>
-          
-          {/* TAB 3: LAYANAN & PORTFOLIO */}
-          <TabsContent value="layanan" className="space-y-8">
-             <Card>
-                <CardHeader><CardTitle>Portofolio Carousel</CardTitle><CardDescription>Foto ini akan muncul di halaman detail MUA Anda.</CardDescription></CardHeader>
-                <CardContent>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                        {(muaProfile?.portfolio_images || []).map((url, index) => (<div key={index} className="relative aspect-square"><img src={url} alt={`Portfolio ${index+1}`} className="w-full h-full object-cover rounded-md" /></div>))}
+              
+              <Card className="border-0 shadow-lg bg-gradient-to-br from-green-50 to-green-100">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Pendapatan Bulan Ini</p>
+                      <p className="text-3xl font-bold text-green-600">
+                        {formatCurrency(bookings.filter(b => new Date(b.booking_date).getMonth() === new Date().getMonth() && b.status === 'completed').reduce((sum, b) => sum + b.total_price, 0))}
+                      </p>
                     </div>
-                    <div><Label htmlFor="portfolio-upload" className="cursor-pointer"><Button asChild variant="outline"><span className="flex items-center gap-2"><Upload className="h-4 w-4"/> Unggah Foto Baru</span></Button></Label><Input id="portfolio-upload" type="file" className="hidden" accept="image/*" onChange={handlePortfolioUpload} /></div>
+                    <DollarSign className="h-12 w-12 text-green-500/50" />
+                  </div>
                 </CardContent>
-            </Card>
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between"><div><CardTitle>Manajemen Layanan</CardTitle><CardDescription>Atur gaya makeup, harga, dan foto untuk setiap layanan.</CardDescription></div><Button><PlusCircle className="h-4 w-4 mr-2"/> Tambah Layanan</Button></CardHeader>
-                <CardContent>
-                    {/* Di sini bisa Anda tampilkan daftar layanan dalam bentuk tabel atau card untuk diedit */}
+              </Card>
+              
+              <Card className="border-0 shadow-lg bg-gradient-to-br from-purple-50 to-purple-100">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-600">Layanan Aktif</p>
+                      <p className="text-3xl font-bold text-purple-600">{services.filter(s => s.is_active).length}</p>
+                    </div>
+                    <Star className="h-12 w-12 text-purple-500/50" />
+                  </div>
                 </CardContent>
+              </Card>
+            </div>
+
+            {/* Recent Bookings */}
+            <Card className="border-0 shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Clock className="h-5 w-5 text-purple-600" />
+                  Pesanan Terbaru
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {bookings.slice(0, 5).map(booking => (
+                    <div key={booking.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <h4 className="font-medium">{booking.profiles?.full_name}</h4>
+                          <Badge className={`${getStatusColor(booking.status)} border-0`}>
+                            {booking.status}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-gray-600">{booking.services?.name}</p>
+                        <p className="text-xs text-gray-500">
+                          {new Date(booking.booking_date).toLocaleDateString('id-ID')} • {booking.booking_time}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold text-purple-600">{formatCurrency(booking.total_price)}</p>
+                      </div>
+                    </div>
+                  ))}
+                  {bookings.length === 0 && (
+                    <div className="text-center py-12 text-gray-500">
+                      <CalendarIcon className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>Belum ada pesanan</p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
             </Card>
           </TabsContent>
 
-          {/* TAB 4: JADWAL */}
-          <TabsContent value="jadwal">
-            <Card>
-              <CardHeader><CardTitle>Atur Ketersediaan</CardTitle><CardDescription>Klik tanggal untuk menandainya sebagai "tidak tersedia".</CardDescription></CardHeader>
-              <CardContent className="flex justify-center">
-                 <Calendar mode="multiple" selected={unavailableDates} onSelect={setUnavailableDates} disabled={(date) => date < new Date(new Date().setDate(new Date().getDate() - 1))} className="p-0" />
+          {/* Services & Portfolio Tab */}
+          <TabsContent value="layanan" className="space-y-6">
+            {/* Portfolio Section */}
+            <Card className="border-0 shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Eye className="h-5 w-5 text-purple-600" />
+                  Portfolio Gallery
+                </CardTitle>
+                <CardDescription>Showcase your best work to attract more clients</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                  {(muaProfile?.portfolio_images || []).map((url, index) => (
+                    <div key={index} className="relative aspect-square group">
+                      <img 
+                        src={url} 
+                        alt={`Portfolio ${index+1}`} 
+                        className="w-full h-full object-cover rounded-lg shadow-md group-hover:shadow-lg transition-shadow" 
+                      />
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors rounded-lg" />
+                    </div>
+                  ))}
+                  {(muaProfile?.portfolio_images || []).length === 0 && (
+                    <div className="col-span-full text-center py-12 text-gray-500 border-2 border-dashed border-gray-200 rounded-lg">
+                      <Upload className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>Belum ada foto portfolio</p>
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="portfolio-upload" className="cursor-pointer">
+                    <Button asChild variant="outline" className="border-purple-200 hover:bg-purple-50">
+                      <span className="flex items-center gap-2">
+                        <Upload className="h-4 w-4"/> 
+                        Unggah Foto Portfolio
+                      </span>
+                    </Button>
+                  </Label>
+                  <Input id="portfolio-upload" type="file" className="hidden" accept="image/*" onChange={handlePortfolioUpload} />
+                </div>
               </CardContent>
-              <DialogFooter className="p-6 pt-0"><Button>Simpan Jadwal</Button></DialogFooter>
+            </Card>
+
+            {/* Services Section */}
+            <Card className="border-0 shadow-lg">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Star className="h-5 w-5 text-purple-600" />
+                    Layanan Makeup
+                  </CardTitle>
+                  <CardDescription>Kelola paket layanan dan harga Anda</CardDescription>
+                </div>
+                <Button className="bg-purple-600 hover:bg-purple-700">
+                  <PlusCircle className="h-4 w-4 mr-2"/> 
+                  Tambah Layanan
+                </Button>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-4">
+                  {services.map(service => (
+                    <div key={service.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-1">
+                          <h4 className="font-medium">{service.name}</h4>
+                          <Badge variant={service.is_active ? "default" : "secondary"}>
+                            {service.is_active ? "Aktif" : "Nonaktif"}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-gray-600">
+                          {formatCurrency(service.price_min)} 
+                          {service.price_max && ` - ${formatCurrency(service.price_max)}`}
+                        </p>
+                        {service.duration_minutes && (
+                          <p className="text-xs text-gray-500">{service.duration_minutes} menit</p>
+                        )}
+                      </div>
+                      <Button variant="ghost" size="sm">
+                        Edit
+                      </Button>
+                    </div>
+                  ))}
+                  {services.length === 0 && (
+                    <div className="text-center py-12 text-gray-500">
+                      <Star className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>Belum ada layanan ditambahkan</p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Edit Profile Tab */}
+          <TabsContent value="edit_profil">
+            <Card className="border-0 shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Settings className="h-5 w-5 text-purple-600" />
+                  Edit Profil
+                </CardTitle>
+                <CardDescription>Update informasi profil dan bisnis Anda</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleProfileUpdate} className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="business_name">Nama Bisnis</Label>
+                      <Input 
+                        id="business_name" 
+                        value={editForm.business_name} 
+                        onChange={(e) => setEditForm({...editForm, business_name: e.target.value})}
+                        className="border-gray-200 focus:border-purple-400"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="full_name">Nama Lengkap</Label>
+                      <Input 
+                        id="full_name" 
+                        value={editForm.full_name} 
+                        onChange={(e) => setEditForm({...editForm, full_name: e.target.value})}
+                        className="border-gray-200 focus:border-purple-400"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="phone">Nomor Telepon</Label>
+                      <Input 
+                        id="phone" 
+                        value={editForm.phone} 
+                        onChange={(e) => setEditForm({...editForm, phone: e.target.value})}
+                        className="border-gray-200 focus:border-purple-400"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="location_city">Kota</Label>
+                      <Input 
+                        id="location_city" 
+                        value={editForm.location_city} 
+                        onChange={(e) => setEditForm({...editForm, location_city: e.target.value})}
+                        className="border-gray-200 focus:border-purple-400"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="location_address">Alamat Lengkap</Label>
+                    <Textarea 
+                      id="location_address" 
+                      value={editForm.location_address} 
+                      onChange={(e) => setEditForm({...editForm, location_address: e.target.value})}
+                      placeholder="Jalan, nomor, kelurahan, kecamatan..."
+                      className="border-gray-200 focus:border-purple-400"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="bio">Bio / Deskripsi</Label>
+                    <Textarea 
+                      id="bio" 
+                      value={editForm.bio} 
+                      onChange={(e) => setEditForm({...editForm, bio: e.target.value})}
+                      placeholder="Ceritakan tentang keahlian dan pengalaman Anda..."
+                      className="border-gray-200 focus:border-purple-400"
+                    />
+                  </div>
+                  <div className="flex justify-end">
+                    <Button type="submit" className="bg-purple-600 hover:bg-purple-700">
+                      <Save className="h-4 w-4 mr-2" />
+                      Simpan Perubahan
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          {/* Schedule Tab */}
+          <TabsContent value="jadwal">
+            <Card className="border-0 shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CalendarIcon className="h-5 w-5 text-purple-600" />
+                  Atur Ketersediaan
+                </CardTitle>
+                <CardDescription>Kelola jadwal dan ketersediaan Anda</CardDescription>
+              </CardHeader>
+              <CardContent className="flex justify-center">
+                <Calendar 
+                  mode="multiple" 
+                  selected={unavailableDates} 
+                  onSelect={setUnavailableDates} 
+                  disabled={(date) => date < new Date(new Date().setDate(new Date().getDate() - 1))} 
+                  className="p-0 border rounded-lg" 
+                />
+              </CardContent>
+              <div className="p-6 pt-0 flex justify-end">
+                <Button className="bg-purple-600 hover:bg-purple-700">
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Simpan Jadwal
+                </Button>
+              </div>
             </Card>
           </TabsContent>
         </Tabs>
