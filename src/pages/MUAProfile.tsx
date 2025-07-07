@@ -23,6 +23,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import AddServiceModal from "@/components/AddServiceModal";
 
 // --- INTERFACE (diperbarui untuk data baru) ---
 interface MUAProfile {
@@ -175,23 +176,76 @@ const MUAProfile = () => {
   const handlePortfolioUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || !user || !muaProfile) return;
-    toast({ description: "Mengunggah foto..." });
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${user.id}-${Date.now()}.${fileExt}`;
-    const { error: uploadError } = await supabase.storage.from('portfolios').upload(fileName, file);
-    if (uploadError) {
-      toast({ title: "Gagal Unggah", description: uploadError.message, variant: "destructive" });
+    
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ 
+        title: "Error", 
+        description: "Ukuran file maksimal 5MB", 
+        variant: "destructive" 
+      });
       return;
     }
-    const { data } = supabase.storage.from('portfolios').getPublicUrl(fileName);
-    const updatedImages = [...(muaProfile.portfolio_images || []), data.publicUrl];
-    const { error: dbError } = await supabase.from('mua_profiles').update({ portfolio_images: updatedImages }).eq('id', muaProfile.id);
-    if (dbError) {
-      toast({ title: "Gagal Simpan", description: dbError.message, variant: "destructive" });
-    } else {
-      toast({ title: "Berhasil", description: "Foto portofolio ditambahkan." });
-      fetchAllData();
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast({ 
+        title: "Error", 
+        description: "File harus berupa gambar", 
+        variant: "destructive" 
+      });
+      return;
     }
+
+    toast({ description: "Mengunggah foto..." });
+    
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `portfolio-${user.id}-${Date.now()}.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('portfolio')
+        .upload(fileName, file);
+        
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        throw uploadError;
+      }
+      
+      const { data } = supabase.storage
+        .from('portfolio')
+        .getPublicUrl(fileName);
+      
+      const updatedImages = [...(muaProfile.portfolio_images || []), data.publicUrl];
+      
+      const { error: dbError } = await supabase
+        .from('mua_profiles')
+        .update({ portfolio_images: updatedImages })
+        .eq('id', muaProfile.id);
+        
+      if (dbError) {
+        console.error('Database error:', dbError);
+        throw dbError;
+      }
+      
+      toast({ 
+        title: "Berhasil", 
+        description: "Foto portofolio berhasil ditambahkan." 
+      });
+      
+      await fetchAllData();
+      
+    } catch (error: any) {
+      console.error('Portfolio upload error:', error);
+      toast({ 
+        title: "Gagal Unggah", 
+        description: error.message || "Terjadi kesalahan saat mengunggah foto", 
+        variant: "destructive" 
+      });
+    }
+    
+    // Reset input
+    event.target.value = '';
   };
 
   if (pageLoading || authLoading) {
@@ -404,7 +458,13 @@ const MUAProfile = () => {
                       </span>
                     </Button>
                   </Label>
-                  <Input id="portfolio-upload" type="file" className="hidden" accept="image/*" onChange={handlePortfolioUpload} />
+                  <Input 
+                    id="portfolio-upload" 
+                    type="file" 
+                    className="hidden" 
+                    accept="image/*" 
+                    onChange={handlePortfolioUpload} 
+                  />
                 </div>
               </CardContent>
             </Card>
@@ -419,29 +479,43 @@ const MUAProfile = () => {
                   </CardTitle>
                   <CardDescription>Kelola paket layanan dan harga Anda</CardDescription>
                 </div>
-                <Button className="bg-purple-600 hover:bg-purple-700">
-                  <PlusCircle className="h-4 w-4 mr-2"/> 
-                  Tambah Layanan
-                </Button>
+                {muaProfile && (
+                  <AddServiceModal 
+                    muaProfileId={muaProfile.id} 
+                    onServiceAdded={fetchAllData}
+                  />
+                )}
               </CardHeader>
               <CardContent>
                 <div className="grid gap-4">
                   {services.map(service => (
                     <div key={service.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-1">
-                          <h4 className="font-medium">{service.name}</h4>
-                          <Badge variant={service.is_active ? "default" : "secondary"}>
-                            {service.is_active ? "Aktif" : "Nonaktif"}
-                          </Badge>
-                        </div>
-                        <p className="text-sm text-gray-600">
-                          {formatCurrency(service.price_min)} 
-                          {service.price_max && ` - ${formatCurrency(service.price_max)}`}
-                        </p>
-                        {service.duration_minutes && (
-                          <p className="text-xs text-gray-500">{service.duration_minutes} menit</p>
+                      <div className="flex items-start gap-4 flex-1">
+                        {service.image_url && (
+                          <img 
+                            src={service.image_url} 
+                            alt={service.name}
+                            className="w-16 h-16 object-cover rounded-lg"
+                          />
                         )}
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-1">
+                            <h4 className="font-medium">{service.name}</h4>
+                            <Badge variant={service.is_active ? "default" : "secondary"}>
+                              {service.is_active ? "Aktif" : "Nonaktif"}
+                            </Badge>
+                          </div>
+                          {service.description && (
+                            <p className="text-sm text-gray-600 mb-1">{service.description}</p>
+                          )}
+                          <p className="text-sm text-gray-600">
+                            {formatCurrency(service.price_min)} 
+                            {service.price_max && ` - ${formatCurrency(service.price_max)}`}
+                          </p>
+                          {service.duration_minutes && (
+                            <p className="text-xs text-gray-500">{service.duration_minutes} menit</p>
+                          )}
+                        </div>
                       </div>
                       <Button variant="ghost" size="sm">
                         Edit
@@ -452,6 +526,7 @@ const MUAProfile = () => {
                     <div className="text-center py-12 text-gray-500">
                       <Star className="h-12 w-12 mx-auto mb-4 opacity-50" />
                       <p>Belum ada layanan ditambahkan</p>
+                      <p className="text-sm mt-2">Klik tombol "Tambah Layanan" untuk memulai</p>
                     </div>
                   )}
                 </div>
