@@ -250,6 +250,79 @@ const MUAProfile = () => {
     event.target.value = '';
   };
 
+  const handleAvatarUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !user || !userProfile) return;
+    
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ 
+        title: "Error", 
+        description: "Ukuran file maksimal 5MB", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast({ 
+        title: "Error", 
+        description: "File harus berupa gambar", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    toast({ description: "Mengunggah foto profil..." });
+    
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `avatar-${user.id}-${Date.now()}.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(fileName, file);
+        
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        throw uploadError;
+      }
+      
+      const { data } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(fileName);
+      
+      const { error: dbError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: data.publicUrl })
+        .eq('id', userProfile.id);
+        
+      if (dbError) {
+        console.error('Database error:', dbError);
+        throw dbError;
+      }
+      
+      toast({ 
+        title: "Berhasil", 
+        description: "Foto profil berhasil diperbarui." 
+      });
+      
+      await fetchAllData();
+      
+    } catch (error: any) {
+      console.error('Avatar upload error:', error);
+      toast({ 
+        title: "Gagal Unggah", 
+        description: error.message || "Terjadi kesalahan saat mengunggah foto", 
+        variant: "destructive" 
+      });
+    }
+    
+    // Reset input
+    event.target.value = '';
+  };
+
   if (pageLoading || authLoading) {
     return <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-pink-50"><div className="text-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div><p className="text-gray-600">Memuat Profil...</p></div></div>;
   }
@@ -276,12 +349,24 @@ const MUAProfile = () => {
         <Card className="mb-8 overflow-hidden border-0 shadow-lg bg-gradient-to-r from-purple-600 to-pink-600">
           <CardContent className="p-8 text-white">
             <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
-              <Avatar className="h-24 w-24 border-4 border-white shadow-lg">
-                <AvatarImage src={userProfile?.avatar_url || ''} />
-                <AvatarFallback className="bg-white text-purple-600 text-2xl font-bold">
-                  {userProfile?.full_name?.charAt(0) || <User className="h-12 w-12" />}
-                </AvatarFallback>
-              </Avatar>
+              <div className="relative group">
+                <Avatar className="h-24 w-24 border-4 border-white shadow-lg">
+                  <AvatarImage src={userProfile?.avatar_url || ''} />
+                  <AvatarFallback className="bg-white text-purple-600 text-2xl font-bold">
+                    {userProfile?.full_name?.charAt(0) || <User className="h-12 w-12" />}
+                  </AvatarFallback>
+                </Avatar>
+                <Label htmlFor="avatar-upload" className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer rounded-full">
+                  <Upload className="h-6 w-6 text-white" />
+                </Label>
+                <Input 
+                  id="avatar-upload" 
+                  type="file" 
+                  className="hidden" 
+                  accept="image/*" 
+                  onChange={handleAvatarUpload} 
+                />
+              </div>
               
               <div className="flex-1 space-y-2">
                 <h1 className="text-3xl font-bold">{muaProfile?.business_name || userProfile?.full_name}</h1>
