@@ -34,9 +34,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [role, setRole] = useState<'customer' | 'mua' | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Session timeout - 24 hours
-  const SESSION_TIMEOUT = 24 * 60 * 60 * 1000;
-
   useEffect(() => {
     const fetchSessionAndRole = async () => {
       console.log("Mulai mengambil sesi...");
@@ -48,35 +45,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return;
       }
       
-      // Check session expiry
-      if (session && session.expires_at) {
-        const expiresAt = session.expires_at * 1000; // Convert to milliseconds
-        const now = Date.now();
-        
-        if (now >= expiresAt) {
-          console.log("Session expired, signing out");
-          await supabase.auth.signOut();
-          setSession(null);
-          setUser(null);
-          setRole(null);
-          setLoading(false);
-          return;
-        }
-      }
-      
       setSession(session);
       const currentUser = session?.user ?? null;
       setUser(currentUser);
 
       if (currentUser) {
         console.log("Sesi ditemukan untuk:", currentUser.email);
-        
-        // Check if email is verified (if email confirmation is enabled)
-        if (currentUser.email_confirmed_at === null) {
-          console.warn("Email belum diverifikasi untuk user:", currentUser.email);
-          // You might want to redirect to email verification page here
-        }
-        
         try {
           const { data, error } = await supabase
             .from('profiles')
@@ -103,7 +77,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         console.log("Tidak ada sesi aktif.");
         setRole(null);
       }
-      
+      // Pastikan loading selesai di semua skenario
       setLoading(false);
       console.log("Proses autentikasi awal selesai.");
     };
@@ -113,94 +87,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         console.log("Status Auth berubah, event:", _event);
+        // Panggil kembali fungsi utama untuk memuat ulang semua data jika ada perubahan
         fetchSessionAndRole();
       }
     );
 
-    // Set up session timeout check
-    const sessionTimeoutInterval = setInterval(() => {
-      if (session && session.expires_at) {
-        const expiresAt = session.expires_at * 1000;
-        const now = Date.now();
-        
-        if (now >= expiresAt) {
-          console.log("Session timeout, signing out");
-          supabase.auth.signOut();
-        }
-      }
-    }, 60000); // Check every minute
-
-    return () => {
-      subscription.unsubscribe();
-      clearInterval(sessionTimeoutInterval);
-    };
+    return () => subscription.unsubscribe();
   }, []);
 
   const signIn = async (email: string, password: string) => {
     setLoading(true);
-    
-    // Basic input validation and sanitization
-    const sanitizedEmail = email.trim().toLowerCase();
-    
-    if (!sanitizedEmail || !password) {
-      setLoading(false);
-      return { error: { message: "Email dan password harus diisi" } };
-    }
-    
-    // Email format validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(sanitizedEmail)) {
-      setLoading(false);
-      return { error: { message: "Format email tidak valid" } };
-    }
-    
-    const { error } = await supabase.auth.signInWithPassword({ 
-      email: sanitizedEmail, 
-      password 
-    });
-    
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    // `onAuthStateChange` akan menangani sisanya, kita hanya perlu menunggu loading selesai.
     return { error };
   };
 
   const signUp = async (email: string, password: string, userData: { fullName: string; userType: 'customer' | 'mua'; phone?: string; }) => {
-    // Input validation and sanitization
-    const sanitizedEmail = email.trim().toLowerCase();
-    const sanitizedFullName = userData.fullName.trim();
-    const sanitizedPhone = userData.phone?.trim();
-    
-    if (!sanitizedEmail || !password || !sanitizedFullName) {
-      return { error: { message: "Semua field wajib harus diisi" } };
-    }
-    
-    // Email format validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(sanitizedEmail)) {
-      return { error: { message: "Format email tidak valid" } };
-    }
-    
-    // Password strength validation
-    if (password.length < 8) {
-      return { error: { message: "Password minimal 8 karakter" } };
-    }
-    
-    if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(password)) {
-      return { error: { message: "Password harus mengandung huruf besar, huruf kecil, dan angka" } };
-    }
-    
-    // Phone validation if provided
-    if (sanitizedPhone && !/^\d{10,15}$/.test(sanitizedPhone.replace(/\D/g, ''))) {
-      return { error: { message: "Format nomor telepon tidak valid" } };
-    }
-    
+    // PENTING: Supabase sekarang merekomendasikan menyimpan data tambahan di 'options.data'
     const { data, error } = await supabase.auth.signUp({
-      email: sanitizedEmail, 
-      password,
+      email, password,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth`,
         data: {
-          full_name: sanitizedFullName,
+          full_name: userData.fullName,
           user_type: userData.userType,
-          phone: sanitizedPhone
+          phone: userData.phone
         }
       }
     });
@@ -209,12 +119,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return { error };
     }
     
+    // Kita tidak perlu insert manual lagi jika menggunakan `options.data` DAN
+    // Anda memiliki trigger di database yang memindahkan data dari `auth.users.raw_user_meta_data` ke tabel `profiles`.
+    // Jika tidak ada trigger, insert manual masih diperlukan. Anggap saja kita tetap insert manual untuk keamanan.
     if (data.user) {
         const { error: profileError } = await supabase.from('profiles').insert({
             user_id: data.user.id,
-            full_name: sanitizedFullName,
+            full_name: userData.fullName,
             user_type: userData.userType,
-            phone: sanitizedPhone,
+            phone: userData.phone,
         });
         if (profileError) return { error: profileError };
     }
@@ -223,8 +136,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signOut = async () => {
-    setLoading(true);
+    setLoading(true); // Mulai loading saat proses logout
     const { error } = await supabase.auth.signOut();
+    // `onAuthStateChange` akan mendeteksi logout dan membersihkan state.
     return { error };
   };
 

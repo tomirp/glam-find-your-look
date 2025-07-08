@@ -2,34 +2,14 @@ import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, CreditCard, Building2, Wallet, QrCode, AlertTriangle } from "lucide-react";
-import SecureInput from "@/components/SecureInput";
-import { useRateLimiter } from "@/hooks/useRateLimiter";
-import { validateCreditCard, validateCVV, validateExpiryDate, sanitizeInput } from "@/utils/paymentSecurity";
-import { useToast } from "@/hooks/use-toast";
+import { ArrowLeft, CreditCard, Building2, Wallet, QrCode } from "lucide-react";
 
 const Payment = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { orderData } = location.state || {};
-  const { toast } = useToast();
   
   const [selectedPayment, setSelectedPayment] = useState("credit_card");
-  const [cardData, setCardData] = useState({
-    cardNumber: "",
-    expiryDate: "",
-    cvv: "",
-    cardholderName: ""
-  });
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [isProcessing, setIsProcessing] = useState(false);
-
-  // Rate limiter for payment attempts
-  const paymentRateLimit = useRateLimiter({
-    maxAttempts: 3,
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    blockDurationMs: 30 * 60 * 1000 // 30 minutes block
-  });
   
   if (!orderData) {
     navigate("/");
@@ -71,86 +51,15 @@ const Payment = () => {
     }).format(amount);
   };
 
-  const validatePaymentForm = (): boolean => {
-    const newErrors: Record<string, string> = {};
-
-    if (selectedPayment === "credit_card") {
-      // Validate card number
-      const cardValidation = validateCreditCard(cardData.cardNumber.replace(/\s/g, ''));
-      if (!cardValidation.isValid) {
-        newErrors.cardNumber = "Nomor kartu tidak valid";
-      }
-
-      // Validate expiry date
-      if (!validateExpiryDate(cardData.expiryDate.replace('/', ''))) {
-        newErrors.expiryDate = "Tanggal kadaluarsa tidak valid";
-      }
-
-      // Validate CVV
-      if (!validateCVV(cardData.cvv, cardValidation.cardType)) {
-        newErrors.cvv = "CVV tidak valid";
-      }
-
-      // Validate cardholder name
-      const sanitizedName = sanitizeInput(cardData.cardholderName);
-      if (!sanitizedName || sanitizedName.length < 2) {
-        newErrors.cardholderName = "Nama pemegang kartu harus diisi";
-      }
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handlePayment = async () => {
-    // Check rate limit
-    const rateLimitCheck = paymentRateLimit.checkRateLimit();
-    if (!rateLimitCheck.allowed) {
-      const resetTime = rateLimitCheck.resetTime ? new Date(rateLimitCheck.resetTime) : null;
-      toast({
-        title: "Terlalu Banyak Percobaan",
-        description: `Silakan coba lagi ${resetTime ? `pada ${resetTime.toLocaleTimeString()}` : 'nanti'}`,
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Validate form
-    if (!validatePaymentForm()) {
-      paymentRateLimit.recordAttempt();
-      return;
-    }
-
-    setIsProcessing(true);
-
-    try {
-      // Record the attempt
-      paymentRateLimit.recordAttempt();
-
-      // In a real implementation, you would integrate with a secure payment gateway
-      // For now, we'll simulate the payment process
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      const paymentData = {
-        ...orderData,
-        paymentMethod: selectedPayment,
-        orderId: `GF-${Date.now()}`,
-        timestamp: new Date().toISOString(),
-        // Never store actual card details - this would go to payment processor
-        cardLastFour: selectedPayment === "credit_card" ? 
-          cardData.cardNumber.replace(/\s/g, '').slice(-4) : null
-      };
-      
-      navigate("/confirmation", { state: { paymentData } });
-    } catch (error) {
-      toast({
-        title: "Pembayaran Gagal",
-        description: "Terjadi kesalahan saat memproses pembayaran. Silakan coba lagi.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsProcessing(false);
-    }
+  const handlePayment = () => {
+    const paymentData = {
+      ...orderData,
+      paymentMethod: selectedPayment,
+      orderId: `GF-${Date.now()}`,
+      timestamp: new Date().toISOString()
+    };
+    
+    navigate("/confirmation", { state: { paymentData } });
   };
 
   return (
@@ -179,19 +88,6 @@ const Payment = () => {
             Pilih metode pembayaran yang Anda inginkan
           </p>
         </div>
-
-        {/* Security Notice */}
-        <Card className="mb-6 bg-blue-50 border-blue-200">
-          <CardContent className="p-4">
-            <div className="flex items-start space-x-3">
-              <AlertTriangle className="w-5 h-5 text-blue-600 mt-0.5" />
-              <div className="text-sm text-blue-800">
-                <p className="font-medium mb-1">Keamanan Pembayaran</p>
-                <p>Semua informasi pembayaran Anda dienkripsi dan dilindungi dengan teknologi keamanan terdepan.</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
 
         {/* Order Summary */}
         <Card className="mb-6">
@@ -256,7 +152,7 @@ const Payment = () => {
           </CardContent>
         </Card>
 
-        {/* Secure Payment Details Form */}
+        {/* Payment Details Form */}
         {selectedPayment === "credit_card" && (
           <Card className="mb-6">
             <CardHeader>
@@ -264,51 +160,37 @@ const Payment = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-2">Nomor Kartu *</label>
-                <SecureInput
-                  type="card"
-                  value={cardData.cardNumber}
-                  onChange={(value) => setCardData(prev => ({ ...prev, cardNumber: value }))}
+                <label className="block text-sm font-medium mb-2">Nomor Kartu</label>
+                <input 
+                  type="text" 
                   placeholder="1234 5678 9012 3456"
-                  error={errors.cardNumber}
-                  required
+                  className="w-full h-10 px-3 py-2 rounded-md border border-input bg-background"
                 />
               </div>
-              
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-2">Bulan/Tahun *</label>
-                  <SecureInput
-                    type="expiry"
-                    value={cardData.expiryDate}
-                    onChange={(value) => setCardData(prev => ({ ...prev, expiryDate: value }))}
+                  <label className="block text-sm font-medium mb-2">Bulan/Tahun</label>
+                  <input 
+                    type="text" 
                     placeholder="MM/YY"
-                    error={errors.expiryDate}
-                    required
+                    className="w-full h-10 px-3 py-2 rounded-md border border-input bg-background"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-2">CVV *</label>
-                  <SecureInput
-                    type="cvv"
-                    value={cardData.cvv}
-                    onChange={(value) => setCardData(prev => ({ ...prev, cvv: value }))}
+                  <label className="block text-sm font-medium mb-2">CVV</label>
+                  <input 
+                    type="text" 
                     placeholder="123"
-                    error={errors.cvv}
-                    required
+                    className="w-full h-10 px-3 py-2 rounded-md border border-input bg-background"
                   />
                 </div>
               </div>
-              
               <div>
-                <label className="block text-sm font-medium mb-2">Nama Pemegang Kartu *</label>
-                <SecureInput
-                  type="text"
-                  value={cardData.cardholderName}
-                  onChange={(value) => setCardData(prev => ({ ...prev, cardholderName: value }))}
+                <label className="block text-sm font-medium mb-2">Nama Pemegang Kartu</label>
+                <input 
+                  type="text" 
                   placeholder="John Doe"
-                  error={errors.cardholderName}
-                  required
+                  className="w-full h-10 px-3 py-2 rounded-md border border-input bg-background"
                 />
               </div>
             </CardContent>
@@ -327,11 +209,10 @@ const Payment = () => {
         {/* Pay Button */}
         <Button 
           onClick={handlePayment}
-          disabled={isProcessing || paymentRateLimit.isBlocked}
           className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
           size="lg"
         >
-          {isProcessing ? "Memproses..." : `Bayar ${formatCurrency(orderData.total)}`}
+          Bayar {formatCurrency(orderData.total)}
         </Button>
       </div>
     </div>
