@@ -125,7 +125,7 @@ const MUAProfile = () => {
         const { data: bookingsData } = await supabase.from('bookings').select(`id, booking_date, booking_time, status, total_price, customer_notes, profiles!bookings_customer_id_fkey(full_name), services(name)`).eq('mua_profile_id', muaData.id).order('booking_date', { ascending: false });
         setBookings(bookingsData || []);
 
-        const { data: servicesData, error: servicesError } = await supabase.from('services').select('id, name, price_min, price_max, duration_minutes, is_active, image_url').eq('mua_profile_id', muaData.id).order('name');
+        const { data: servicesData, error: servicesError } = await supabase.from('services').select('id, name, description, price_min, price_max, duration_minutes, is_active, image_url').eq('mua_profile_id', muaData.id).order('name');
         if (servicesError) throw servicesError;
         setServices(servicesData || []);
       }
