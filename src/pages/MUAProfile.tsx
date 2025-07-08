@@ -1,3 +1,4 @@
+
 import { useState, useEffect, ChangeEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -61,6 +62,7 @@ interface Booking {
 interface Service {
   id: string;
   name: string;
+  description: string | null;
   price_min: number;
   price_max: number | null;
   duration_minutes: number | null;
