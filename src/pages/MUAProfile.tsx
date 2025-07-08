@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
-import { ArrowLeft, User, Star, MapPin, Phone, Instagram, Calendar as CalendarIcon, DollarSign, Settings, Save, PlusCircle, Upload, Eye, Clock, CheckCircle } from "lucide-react";
+import { ArrowLeft, User, Star, MapPin, Phone, Instagram, Calendar as CalendarIcon, DollarSign, Settings, Save, PlusCircle, Upload, Eye, Clock, CheckCircle, X } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -96,6 +96,13 @@ const MUAProfile = () => {
   
   const [editForm, setEditForm] = useState({ business_name: '', full_name: '', phone: '', location_city: '', location_address: '', bio: '' });
 
+  // State untuk mengontrol tab yang aktif
+  const [activeTab, setActiveTab] = useState("dashboard");
+  
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+
   // Fungsi untuk mengambil semua data dari Supabase
   const fetchAllData = async () => {
     if (!user) return;
@@ -138,21 +145,64 @@ const MUAProfile = () => {
     if (user) {
       fetchAllData();
     } else if (!authLoading) {
-      setPageLoading(false);
+      navigate('/auth', { replace: true });
     }
-  }, [user, authLoading]);
-
-  useEffect(() => {
-    if (!authLoading && !user) {
-      navigate('/', { replace: true });
-    }
-  }, [user, authLoading, navigate]);
+  }, [user]);
 
   const handleSignOut = async () => {
     const { error } = await signOut();
     if (error) {
       toast({ title: "Gagal Keluar", description: error.message, variant: "destructive" });
+    } else {
+        navigate('/');
     }
+  };
+
+  const handleFileSelect = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreviewImage(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleConfirmUpload = async () => {
+    if (!selectedFile || !user || !muaProfile) return;
+    
+    setUploading(true);
+    toast({ description: "Mengunggah foto..." });
+    
+    const fileExt = selectedFile.name.split('.').pop();
+    const fileName = `${Date.now()}.${fileExt}`;
+    const filePath = `${user.id}/${fileName}`;
+
+    const { error: uploadError } = await supabase.storage.from('portfolio').upload(filePath, selectedFile);
+    
+    if (uploadError) {
+      toast({ title: "Gagal Unggah", description: uploadError.message, variant: "destructive" });
+      setUploading(false);
+      return;
+    }
+
+    const { data } = supabase.storage.from('portfolio').getPublicUrl(filePath);
+    const updatedImages = [...(muaProfile.portfolio_images || []), data.publicUrl];
+    
+    const { error: dbError } = await supabase.from('mua_profiles').update({ portfolio_images: updatedImages }).eq('id', muaProfile.id);
+    
+    if (dbError) {
+      toast({ title: "Gagal Simpan URL", description: dbError.message, variant: "destructive" });
+    } else {
+      toast({ title: "Berhasil", description: "Foto portofolio telah ditambahkan." });
+      await fetchAllData();
+    }
+
+    setPreviewImage(null);
+    setSelectedFile(null);
+    setUploading(false);
   };
 
   const handleProfileUpdate = async (e: React.FormEvent) => {
@@ -172,28 +222,6 @@ const MUAProfile = () => {
     setPageLoading(false);
   };
 
-  const handlePortfolioUpload = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file || !user || !muaProfile) return;
-    toast({ description: "Mengunggah foto..." });
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${user.id}-${Date.now()}.${fileExt}`;
-    const { error: uploadError } = await supabase.storage.from('portfolios').upload(fileName, file);
-    if (uploadError) {
-      toast({ title: "Gagal Unggah", description: uploadError.message, variant: "destructive" });
-      return;
-    }
-    const { data } = supabase.storage.from('portfolios').getPublicUrl(fileName);
-    const updatedImages = [...(muaProfile.portfolio_images || []), data.publicUrl];
-    const { error: dbError } = await supabase.from('mua_profiles').update({ portfolio_images: updatedImages }).eq('id', muaProfile.id);
-    if (dbError) {
-      toast({ title: "Gagal Simpan", description: dbError.message, variant: "destructive" });
-    } else {
-      toast({ title: "Berhasil", description: "Foto portofolio ditambahkan." });
-      fetchAllData();
-    }
-  };
-
   if (pageLoading || authLoading) {
     return <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-pink-50"><div className="text-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div><p className="text-gray-600">Memuat Profil...</p></div></div>;
   }
@@ -201,7 +229,6 @@ const MUAProfile = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50">
-      {/* Header */}
       <div className="bg-white shadow-sm border-b">
         <div className="container mx-auto max-w-6xl px-4 py-4">
           <div className="flex items-center justify-between">
@@ -216,7 +243,6 @@ const MUAProfile = () => {
       </div>
 
       <div className="container mx-auto max-w-6xl px-4 py-8">
-        {/* Profile Header Card */}
         <Card className="mb-8 overflow-hidden border-0 shadow-lg bg-gradient-to-r from-purple-600 to-pink-600">
           <CardContent className="p-8 text-white">
             <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
@@ -263,8 +289,7 @@ const MUAProfile = () => {
           </CardContent>
         </Card>
 
-        {/* Main Content Tabs */}
-        <Tabs defaultValue="dashboard" className="space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <div className="bg-white rounded-lg shadow-sm border p-1">
             <TabsList className="grid w-full grid-cols-4 bg-transparent">
               <TabsTrigger value="dashboard" className="data-[state=active]:bg-purple-100 data-[state=active]:text-purple-700">
@@ -282,9 +307,7 @@ const MUAProfile = () => {
             </TabsList>
           </div>
           
-          {/* Dashboard Tab */}
           <TabsContent value="dashboard" className="space-y-6">
-            {/* Stats Cards */}
             <div className="grid gap-6 md:grid-cols-3">
               <Card className="border-0 shadow-lg bg-gradient-to-br from-blue-50 to-blue-100">
                 <CardContent className="p-6">
@@ -297,7 +320,6 @@ const MUAProfile = () => {
                   </div>
                 </CardContent>
               </Card>
-              
               <Card className="border-0 shadow-lg bg-gradient-to-br from-green-50 to-green-100">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
@@ -311,7 +333,6 @@ const MUAProfile = () => {
                   </div>
                 </CardContent>
               </Card>
-              
               <Card className="border-0 shadow-lg bg-gradient-to-br from-purple-50 to-purple-100">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
@@ -324,8 +345,6 @@ const MUAProfile = () => {
                 </CardContent>
               </Card>
             </div>
-
-            {/* Recent Bookings */}
             <Card className="border-0 shadow-lg">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -365,16 +384,14 @@ const MUAProfile = () => {
             </Card>
           </TabsContent>
 
-          {/* Services & Portfolio Tab */}
           <TabsContent value="layanan" className="space-y-6">
-            {/* Portfolio Section */}
             <Card className="border-0 shadow-lg">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Eye className="h-5 w-5 text-purple-600" />
-                  Portfolio Gallery
+                  Galeri Portfolio
                 </CardTitle>
-                <CardDescription>Showcase your best work to attract more clients</CardDescription>
+                <CardDescription>Pamerkan karya terbaik Anda untuk menarik lebih banyak klien.</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
@@ -388,28 +405,50 @@ const MUAProfile = () => {
                       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors rounded-lg" />
                     </div>
                   ))}
-                  {(muaProfile?.portfolio_images || []).length === 0 && (
-                    <div className="col-span-full text-center py-12 text-gray-500 border-2 border-dashed border-gray-200 rounded-lg">
-                      <Upload className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                      <p>Belum ada foto portfolio</p>
+                  {previewImage ? (
+                    <div className="relative aspect-square group col-span-full md:col-span-1 border-2 border-dashed border-purple-200 rounded-lg p-2">
+                        <img src={previewImage} alt="Pratinjau" className="w-full h-full object-cover rounded-md" />
+                        <Button
+                            variant="destructive"
+                            size="icon"
+                            className="absolute -top-3 -right-3 h-7 w-7 rounded-full"
+                            onClick={() => { setPreviewImage(null); setSelectedFile(null); }}
+                        >
+                            <X className="h-4 w-4" />
+                        </Button>
                     </div>
+                  ) : (
+                    (muaProfile?.portfolio_images || []).length === 0 && (
+                      <div className="col-span-full text-center py-12 text-gray-500 border-2 border-dashed border-gray-200 rounded-lg">
+                        <Upload className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                        <p>Belum ada foto portfolio</p>
+                      </div>
+                    )
                   )}
                 </div>
-                <div>
+                <div className="flex items-center gap-4">
                   <Label htmlFor="portfolio-upload" className="cursor-pointer">
                     <Button asChild variant="outline" className="border-purple-200 hover:bg-purple-50">
                       <span className="flex items-center gap-2">
                         <Upload className="h-4 w-4"/> 
-                        Unggah Foto Portfolio
+                        {previewImage ? 'Ganti Foto' : 'Pilih Foto'}
                       </span>
                     </Button>
                   </Label>
-                  <Input id="portfolio-upload" type="file" className="hidden" accept="image/*" onChange={handlePortfolioUpload} />
+                  <Input id="portfolio-upload" type="file" className="hidden" accept="image/*" onChange={handleFileSelect} />
+
+                  {previewImage && (
+                    <Button 
+                        onClick={handleConfirmUpload} 
+                        disabled={uploading}
+                        className="bg-purple-600 hover:bg-purple-700"
+                    >
+                      {uploading ? 'Mengunggah...' : 'Unggah Sekarang'}
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>
-
-            {/* Services Section */}
             <Card className="border-0 shadow-lg">
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
@@ -459,7 +498,6 @@ const MUAProfile = () => {
             </Card>
           </TabsContent>
 
-          {/* Edit Profile Tab */}
           <TabsContent value="edit_profil">
             <Card className="border-0 shadow-lg">
               <CardHeader>
@@ -540,7 +578,6 @@ const MUAProfile = () => {
             </Card>
           </TabsContent>
           
-          {/* Schedule Tab */}
           <TabsContent value="jadwal">
             <Card className="border-0 shadow-lg">
               <CardHeader>

@@ -200,50 +200,56 @@ INSERT INTO storage.buckets (id, name, public) VALUES ('avatars', 'avatars', tru
 INSERT INTO storage.buckets (id, name, public) VALUES ('portfolio', 'portfolio', true);
 INSERT INTO storage.buckets (id, name, public) VALUES ('reviews', 'reviews', true);
 
+-- **PERBAIKAN KEBIJAKAN PENYIMPANAN DI SINI**
+
 -- Create storage policies for avatars
 CREATE POLICY "Avatar images are publicly accessible" ON storage.objects FOR SELECT USING (bucket_id = 'avatars');
-CREATE POLICY "Users can upload their own avatar" ON storage.objects FOR INSERT WITH CHECK (
-  bucket_id = 'avatars' AND auth.uid()::text = (storage.foldername(name))[1]
-);
-CREATE POLICY "Users can update their own avatar" ON storage.objects FOR UPDATE USING (
-  bucket_id = 'avatars' AND auth.uid()::text = (storage.foldername(name))[1]
-);
-CREATE POLICY "Users can delete their own avatar" ON storage.objects FOR DELETE USING (
-  bucket_id = 'avatars' AND auth.uid()::text = (storage.foldername(name))[1]
-);
+CREATE POLICY "Anyone can upload an avatar." ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'avatars');
 
 -- Create storage policies for portfolio
 CREATE POLICY "Portfolio images are publicly accessible" ON storage.objects FOR SELECT USING (bucket_id = 'portfolio');
-CREATE POLICY "MUA can upload their portfolio images" ON storage.objects FOR INSERT WITH CHECK (
-  bucket_id = 'portfolio' AND auth.uid()::text = (storage.foldername(name))[1]
+CREATE POLICY "MUA can upload portfolio images" ON storage.objects FOR INSERT WITH CHECK (
+    bucket_id = 'portfolio' AND
+    EXISTS (
+        SELECT 1
+        FROM public.profiles
+        WHERE profiles.user_id = auth.uid() AND profiles.user_type = 'mua'
+    )
 );
-CREATE POLICY "MUA can update their portfolio images" ON storage.objects FOR UPDATE USING (
-  bucket_id = 'portfolio' AND auth.uid()::text = (storage.foldername(name))[1]
+CREATE POLICY "MUA can update their own portfolio images" ON storage.objects FOR UPDATE USING (
+    bucket_id = 'portfolio' AND
+    auth.uid() = (storage.foldername(name))[1]::uuid
 );
-CREATE POLICY "MUA can delete their portfolio images" ON storage.objects FOR DELETE USING (
-  bucket_id = 'portfolio' AND auth.uid()::text = (storage.foldername(name))[1]
+CREATE POLICY "MUA can delete their own portfolio images" ON storage.objects FOR DELETE USING (
+    bucket_id = 'portfolio' AND
+    auth.uid() = (storage.foldername(name))[1]::uuid
 );
+
 
 -- Create storage policies for review images
 CREATE POLICY "Review images are publicly accessible" ON storage.objects FOR SELECT USING (bucket_id = 'reviews');
-CREATE POLICY "Users can upload review images" ON storage.objects FOR INSERT WITH CHECK (
-  bucket_id = 'reviews' AND auth.uid()::text = (storage.foldername(name))[1]
-);
-CREATE POLICY "Users can update review images" ON storage.objects FOR UPDATE USING (
-  bucket_id = 'reviews' AND auth.uid()::text = (storage.foldername(name))[1]
-);
-CREATE POLICY "Users can delete review images" ON storage.objects FOR DELETE USING (
-  bucket_id = 'reviews' AND auth.uid()::text = (storage.foldername(name))[1]
-);
+CREATE POLICY "Authenticated users can upload review images" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'reviews' and auth.role() = 'authenticated');
+
 
 -- Create function to automatically create profile trigger
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  -- This will be handled by the application after signup
+  INSERT INTO public.profiles (user_id, full_name, user_type, phone)
+  VALUES (
+    NEW.id,
+    NEW.raw_user_meta_data->>'full_name',
+    (NEW.raw_user_meta_data->>'user_type')::public.user_type,
+    NEW.raw_user_meta_data->>'phone'
+  );
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Create trigger to execute the function on new user creation
+CREATE OR REPLACE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
 -- Create function to update MUA rating when review is added
 CREATE OR REPLACE FUNCTION public.update_mua_rating()
