@@ -62,6 +62,7 @@ interface Booking {
   customer_notes: string | null;
   profiles: { full_name: string; };
   services: { name: string; };
+  payments: { payment_status: string; } | null;
 }
 
 interface Service {
@@ -141,14 +142,20 @@ const MUAProfile = () => {
       });
 
       if (muaData) {
-        const { data: bookingsData } = await supabase.from('bookings').select(`id, booking_date, booking_time, status, total_price, customer_notes, profiles!bookings_customer_id_fkey(full_name), services(name)`).eq('mua_profile_id', muaData.id).order('booking_date', { ascending: false });
-        setBookings(bookingsData || []);
+        const { data: bookingsData, error: bookingError } = await supabase
+          .from('bookings')
+          .select(`id, booking_date, booking_time, status, total_price, customer_notes, profiles!bookings_customer_id_fkey(full_name), services(name), payments!left(payment_status)`)
+          .eq('mua_profile_id', muaData.id)
+          .order('booking_date', { ascending: false });
+        if(bookingError) throw bookingError;
+        const typedBookings = bookingsData.map(b => ({...b, payments: Array.isArray(b.payments) ? b.payments[0] : b.payments})) as Booking[];
+        setBookings(typedBookings);
 
         const { data: servicesData, error: servicesError } = await supabase.from('services').select('*').eq('mua_profile_id', muaData.id).order('name');
         if (servicesError) throw servicesError;
         setServices(servicesData || []);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching data:', error);
       toast({ title: "Error", description: "Gagal memuat data profil.", variant: "destructive" });
     } finally {
@@ -530,18 +537,31 @@ const MUAProfile = () => {
               <CardContent>
                 <div className="space-y-4">
                   {bookings.slice(0, 5).map(booking => (
-                    <div key={booking.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <h4 className="font-medium">{booking.profiles?.full_name}</h4>
-                          <Badge className={`${getStatusColor(booking.status)} border-0`}>{booking.status}</Badge>
+                    <div key={booking.id} className="p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <h4 className="font-medium">{booking.profiles?.full_name}</h4>
+                            <Badge className={`${getStatusColor(booking.status)} border-0`}>{booking.status}</Badge>
+                            <Badge variant={booking.payments?.payment_status === 'paid' ? 'default' : 'destructive'}>
+                              {booking.payments?.payment_status === 'paid' ? 'Sudah Bayar' : 'Belum Bayar'}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-gray-600">{booking.services?.name}</p>
+                          <p className="text-xs text-gray-500">{new Date(booking.booking_date).toLocaleDateString('id-ID')} • {booking.booking_time}</p>
                         </div>
-                        <p className="text-sm text-gray-600">{booking.services?.name}</p>
-                        <p className="text-xs text-gray-500">{new Date(booking.booking_date).toLocaleDateString('id-ID')} • {booking.booking_time}</p>
+                        <div className="text-right">
+                          <p className="font-semibold text-purple-600">{formatCurrency(booking.total_price)}</p>
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <p className="font-semibold text-purple-600">{formatCurrency(booking.total_price)}</p>
-                      </div>
+                      {booking.payments?.payment_status === 'paid' && booking.status === 'accepted' && (
+                        <div className="mt-4 border-t pt-4">
+                            <p className="text-sm font-medium mb-2">Status Transportasi</p>
+                            <div className="h-40 bg-gray-200 rounded-md flex items-center justify-center">
+                                <p className="text-gray-500">Peta Transportasi Menjemput...</p>
+                            </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                   {bookings.length === 0 && (<div className="text-center py-12 text-gray-500"><CalendarIcon className="h-12 w-12 mx-auto mb-4 opacity-50" /><p>Belum ada pesanan</p></div>)}
@@ -663,10 +683,14 @@ const MUAProfile = () => {
             <Card className="border-0 shadow-lg">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2"><CalendarIcon className="h-5 w-5 text-purple-600" />Atur Ketersediaan</CardTitle>
-                <CardDescription>Kelola jadwal dan ketersediaan Anda</CardDescription>
+                <CardDescription>Kelola jadwal dan ketersediaan Anda. Pilih tanggal di mana Anda tidak bersedia menerima pesanan.</CardDescription>
               </CardHeader>
-              <CardContent className="flex justify-center">
+              <CardContent className="flex flex-col items-center gap-4">
                 <Calendar mode="multiple" selected={unavailableDates} onSelect={setUnavailableDates} disabled={(date) => date < new Date(new Date().setDate(new Date().getDate() - 1))} className="p-0 border rounded-lg" />
+                <div className="flex items-center gap-2 text-sm text-muted-foreground self-start mt-2 border p-2 rounded-md">
+                    <div className="h-4 w-4 rounded-sm bg-primary"></div>
+                    <span>Tanggal yang ditandai = Tidak Tersedia</span>
+                </div>
               </CardContent>
               <div className="p-6 pt-0 flex justify-end"><Button className="bg-purple-600 hover:bg-purple-700"><CheckCircle className="h-4 w-4 mr-2" />Simpan Jadwal</Button></div>
             </Card>

@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -15,10 +14,14 @@ import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import MUAProfile from "./pages/MUAProfile";
 import CustomerProfile from "./pages/CustomerProfile";
+import MUAOnboarding from "./pages/MUAOnboarding";
+import WaitingForPayment from "./pages/WaitingForPayment"; // Impor halaman baru
 import ProtectedRoute from "./components/ProtectedRoute";
 import CustomerProtectedRoute from "./components/CustomerProtectedRoute";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: { queries: { refetchOnWindowFocus: false } },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -33,6 +36,7 @@ const App = () => (
             <Route path="/search" element={<SearchResults />} />
             <Route element={<ProtectedRoute />}>
               <Route path="/mua/profile" element={<MUAProfile />} />
+              <Route path="/mua/onboarding" element={<MUAOnboarding />} />
             </Route>
             <Route element={<CustomerProtectedRoute />}>
               <Route path="/customer/profile" element={<CustomerProfile />} />
@@ -40,6 +44,7 @@ const App = () => (
             <Route path="/mua/:id" element={<MUADetail />} />
             <Route path="/checkout" element={<Checkout />} />
             <Route path="/payment" element={<Payment />} />
+            <Route path="/waiting-for-payment/:paymentId" element={<WaitingForPayment />} /> {/* Tambah route baru */}
             <Route path="/confirmation" element={<Confirmation />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
@@ -48,5 +53,4 @@ const App = () => (
     </AuthProvider>
   </QueryClientProvider>
 );
-
 export default App;

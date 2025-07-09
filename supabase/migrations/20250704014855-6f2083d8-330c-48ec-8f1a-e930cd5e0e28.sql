@@ -42,6 +42,7 @@ CREATE TABLE public.mua_profiles (
   total_reviews INTEGER DEFAULT 0,
   total_bookings INTEGER DEFAULT 0,
   is_available BOOLEAN DEFAULT TRUE,
+  cover_image_url TEXT,
   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
 );
@@ -56,7 +57,7 @@ CREATE TABLE public.services (
   price_max INTEGER,
   duration_minutes INTEGER,
   is_active BOOLEAN DEFAULT TRUE,
-  image_url TEXT, -- Kolom untuk foto layanan
+  image_url TEXT,
   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
 );
@@ -113,19 +114,67 @@ ALTER TABLE public.bookings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.reviews ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.payments ENABLE ROW LEVEL SECURITY;
 
--- RLS Policies
+-- RLS Policies for profiles
 CREATE POLICY "Users can view all profiles" ON public.profiles FOR SELECT USING (true);
 CREATE POLICY "Users can insert their own profile" ON public.profiles FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users can update their own profile" ON public.profiles FOR UPDATE USING (auth.uid() = user_id);
 
+-- RLS policies for mua_profiles
 CREATE POLICY "Anyone can view MUA profiles" ON public.mua_profiles FOR SELECT USING (true);
 CREATE POLICY "MUA can insert their own profile" ON public.mua_profiles FOR INSERT WITH CHECK (EXISTS (SELECT 1 FROM public.profiles WHERE id = profile_id AND user_id = auth.uid() AND user_type = 'mua'));
 CREATE POLICY "MUA can update their own profile" ON public.mua_profiles FOR UPDATE USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = profile_id AND user_id = auth.uid()));
 
+-- RLS policies for services
 CREATE POLICY "Anyone can view active services" ON public.services FOR SELECT USING (is_active = true);
 CREATE POLICY "MUA can manage their own services" ON public.services FOR ALL USING (EXISTS (SELECT 1 FROM public.mua_profiles mp JOIN public.profiles p ON mp.profile_id = p.id WHERE mp.id = mua_profile_id AND p.user_id = auth.uid()));
 
--- ... (RLS Policies lainnya tetap sama) ...
+-- RLS policies for bookings
+CREATE POLICY "Users can view their own bookings" ON public.bookings FOR SELECT USING (
+  EXISTS (SELECT 1 FROM public.profiles WHERE id = customer_id AND user_id = auth.uid())
+  OR EXISTS (
+    SELECT 1 FROM public.mua_profiles mp 
+    JOIN public.profiles p ON mp.profile_id = p.id 
+    WHERE mp.id = mua_profile_id AND p.user_id = auth.uid()
+  )
+);
+CREATE POLICY "Authenticated users can create bookings" ON public.bookings FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "Users can update their own bookings" ON public.bookings FOR UPDATE USING (
+  EXISTS (SELECT 1 FROM public.profiles WHERE id = customer_id AND user_id = auth.uid())
+  OR EXISTS (
+    SELECT 1 FROM public.mua_profiles mp 
+    JOIN public.profiles p ON mp.profile_id = p.id 
+    WHERE mp.id = mua_profile_id AND p.user_id = auth.uid()
+  )
+);
+
+-- RLS policies for reviews
+CREATE POLICY "Anyone can view reviews" ON public.reviews FOR SELECT USING (true);
+CREATE POLICY "Customers can create reviews for their completed bookings" ON public.reviews FOR INSERT WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM public.bookings b 
+    JOIN public.profiles p ON b.customer_id = p.id 
+    WHERE b.id = booking_id AND p.user_id = auth.uid() AND b.status = 'completed'
+  )
+);
+
+-- RLS policies for payments
+CREATE POLICY "Users can view their own payments" ON public.payments FOR SELECT USING (
+  EXISTS (SELECT 1 FROM public.profiles WHERE id = customer_id AND user_id = auth.uid())
+  OR EXISTS (
+    SELECT 1 FROM public.bookings b 
+    JOIN public.mua_profiles mp ON b.mua_profile_id = mp.id 
+    JOIN public.profiles p ON mp.profile_id = p.id 
+    WHERE b.id = booking_id AND p.user_id = auth.uid()
+  )
+);
+-- **PERBAIKAN KEBIJAKAN INSERT PAYMENT DI SINI**
+CREATE POLICY "Users can create payments for their own bookings" ON public.payments FOR INSERT WITH CHECK (
+    EXISTS (
+        SELECT 1
+        FROM public.profiles
+        WHERE public.profiles.id = customer_id AND public.profiles.user_id = auth.uid()
+    )
+);
 
 -- Create function to update timestamps
 CREATE OR REPLACE FUNCTION public.update_updated_at_column()
@@ -150,22 +199,25 @@ INSERT INTO storage.buckets (id, name, public) VALUES ('portfolio', 'portfolio',
 INSERT INTO storage.buckets (id, name, public) VALUES ('reviews', 'reviews', true) ON CONFLICT (id) DO NOTHING;
 INSERT INTO storage.buckets (id, name, public) VALUES ('services', 'services', true) ON CONFLICT (id) DO NOTHING;
 
--- Create storage policies
+-- Create storage policies for avatars
 CREATE POLICY "Avatar images are publicly accessible" ON storage.objects FOR SELECT USING (bucket_id = 'avatars');
-CREATE POLICY "Anyone can upload an avatar." ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'avatars');
+CREATE POLICY "Users can upload their own avatar" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'avatars' AND auth.uid()::text = (storage.foldername(name))[1]);
+CREATE POLICY "Users can update their own avatar" ON storage.objects FOR UPDATE USING (bucket_id = 'avatars' AND auth.uid()::text = (storage.foldername(name))[1]);
 
+-- Create storage policies for portfolio
 CREATE POLICY "Portfolio images are publicly accessible" ON storage.objects FOR SELECT USING (bucket_id = 'portfolio');
 CREATE POLICY "MUA can upload portfolio images" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'portfolio' AND EXISTS (SELECT 1 FROM public.profiles WHERE profiles.user_id = auth.uid() AND profiles.user_type = 'mua'));
 CREATE POLICY "MUA can update their own portfolio images" ON storage.objects FOR UPDATE USING (bucket_id = 'portfolio' AND auth.uid() = (storage.foldername(name))[1]::uuid);
 CREATE POLICY "MUA can delete their own portfolio images" ON storage.objects FOR DELETE USING (bucket_id = 'portfolio' AND auth.uid() = (storage.foldername(name))[1]::uuid);
 
+-- Create storage policies for review images
 CREATE POLICY "Review images are publicly accessible" ON storage.objects FOR SELECT USING (bucket_id = 'reviews');
 CREATE POLICY "Authenticated users can upload review images" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'reviews' and auth.role() = 'authenticated');
 
+-- Create storage policies for services
 CREATE POLICY "Service images are publicly accessible" ON storage.objects FOR SELECT USING (bucket_id = 'services');
 CREATE POLICY "MUA can upload service images" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'services' AND EXISTS (SELECT 1 FROM public.profiles WHERE profiles.user_id = auth.uid() AND profiles.user_type = 'mua'));
 CREATE POLICY "MUA can update their own service images" ON storage.objects FOR UPDATE USING (bucket_id = 'services' AND auth.uid() = (storage.foldername(name))[1]::uuid);
-
 
 -- Create function to automatically create profile trigger
 CREATE OR REPLACE FUNCTION public.handle_new_user()
@@ -212,53 +264,3 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER update_mua_rating_trigger
   AFTER INSERT ON public.reviews
   FOR EACH ROW EXECUTE FUNCTION public.update_mua_rating();
-
-  -- Create enum for user types
-CREATE TYPE public.user_type AS ENUM ('customer', 'mua');
-
--- Create enum for booking status
-CREATE TYPE public.booking_status AS ENUM ('pending', 'accepted', 'rejected', 'completed', 'cancelled');
-
--- Create enum for payment status
-CREATE TYPE public.payment_status AS ENUM ('pending', 'paid', 'refunded', 'failed');
-
--- Create profiles table
-CREATE TABLE public.profiles (
-  id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id UUID NOT NULL UNIQUE REFERENCES auth.users(id) ON DELETE CASCADE,
-  user_type user_type NOT NULL,
-  full_name TEXT NOT NULL,
-  phone TEXT,
-  address TEXT,
-  avatar_url TEXT,
-  bio TEXT,
-  is_verified BOOLEAN DEFAULT FALSE,
-  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
-  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
-);
-
--- Create MUA profiles table (extends profiles for MUA-specific data)
-CREATE TABLE public.mua_profiles (
-  id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
-  profile_id UUID NOT NULL UNIQUE REFERENCES public.profiles(id) ON DELETE CASCADE,
-  business_name TEXT,
-  experience_years INTEGER,
-  price_range TEXT,
-  location_city TEXT NOT NULL,
-  location_address TEXT,
-  specializations TEXT[],
-  portfolio_images TEXT[],
-  instagram_url TEXT,
-  whatsapp_number TEXT,
-  bank_account_number TEXT,
-  bank_name TEXT,
-  bank_account_name TEXT,
-  rating DECIMAL(3,2) DEFAULT 0.00,
-  total_reviews INTEGER DEFAULT 0,
-  total_bookings INTEGER DEFAULT 0,
-  is_available BOOLEAN DEFAULT TRUE,
-  -- **PENAMBAHAN BARIS DI SINI**
-  cover_image_url TEXT, -- Untuk menyimpan URL foto utama
-  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
-  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
-);

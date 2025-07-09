@@ -20,7 +20,6 @@ interface BookingModalProps {
     name: string;
     location: string;
     styles: Array<{
-      // **PERBAIKAN 2 DI SINI: Ubah 'number' menjadi 'string'**
       id: string;
       name: string;
       price: string;
@@ -45,6 +44,8 @@ const BookingModal = ({ isOpen, onClose, muaData }: BookingModalProps) => {
       muaName: muaData.name,
       muaLocation: muaData.location,
       service: selectedStyle.name,
+      // **PERBAIKAN DI SINI: Menambahkan serviceId**
+      serviceId: selectedStyle.id,
       price: selectedStyle.price,
       date: selectedDate.toISOString(),
       time: selectedTime
@@ -57,8 +58,20 @@ const BookingModal = ({ isOpen, onClose, muaData }: BookingModalProps) => {
   const isDateDisabled = (date: Date) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    
     if (date < today) return true;
-    return false;
+    
+    const disabledDates = [
+      new Date(2025, 6, 10),
+      new Date(2025, 6, 15),
+      new Date(2025, 6, 22),
+    ];
+    
+    return disabledDates.some(disabledDate => 
+      date.getFullYear() === disabledDate.getFullYear() &&
+      date.getMonth() === disabledDate.getMonth() &&
+      date.getDate() === disabledDate.getDate()
+    );
   };
 
   return (
@@ -76,7 +89,6 @@ const BookingModal = ({ isOpen, onClose, muaData }: BookingModalProps) => {
             <select
               value={selectedStyle.id}
               onChange={(e) => {
-                // **PERBAIKAN 3 DI SINI: Hapus parseInt()**
                 const style = muaData.styles.find(s => s.id === e.target.value);
                 if (style) setSelectedStyle(style);
               }}
