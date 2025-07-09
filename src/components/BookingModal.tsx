@@ -20,7 +20,8 @@ interface BookingModalProps {
     name: string;
     location: string;
     styles: Array<{
-      id: number;
+      // **PERBAIKAN 2 DI SINI: Ubah 'number' menjadi 'string'**
+      id: string;
       name: string;
       price: string;
     }>;
@@ -39,7 +40,6 @@ const BookingModal = ({ isOpen, onClose, muaData }: BookingModalProps) => {
       return;
     }
 
-    // Navigate to checkout with booking data
     const bookingData = {
       muaId: muaData.id,
       muaName: muaData.name,
@@ -57,22 +57,8 @@ const BookingModal = ({ isOpen, onClose, muaData }: BookingModalProps) => {
   const isDateDisabled = (date: Date) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
-    // Disable past dates
     if (date < today) return true;
-    
-    // Mock: disable some random dates as "already booked"
-    const disabledDates = [
-      new Date(2025, 6, 10), // July 10, 2025
-      new Date(2025, 6, 15), // July 15, 2025
-      new Date(2025, 6, 22), // July 22, 2025
-    ];
-    
-    return disabledDates.some(disabledDate => 
-      date.getFullYear() === disabledDate.getFullYear() &&
-      date.getMonth() === disabledDate.getMonth() &&
-      date.getDate() === disabledDate.getDate()
-    );
+    return false;
   };
 
   return (
@@ -85,13 +71,13 @@ const BookingModal = ({ isOpen, onClose, muaData }: BookingModalProps) => {
         </DialogHeader>
         
         <div className="space-y-6">
-          {/* Service Selection */}
           <div>
             <Label className="text-sm font-medium mb-2 block">Pilih Layanan</Label>
             <select
               value={selectedStyle.id}
               onChange={(e) => {
-                const style = muaData.styles.find(s => s.id === parseInt(e.target.value));
+                // **PERBAIKAN 3 DI SINI: Hapus parseInt()**
+                const style = muaData.styles.find(s => s.id === e.target.value);
                 if (style) setSelectedStyle(style);
               }}
               className="w-full h-10 px-3 py-2 rounded-md border border-input bg-background text-foreground"
@@ -104,7 +90,6 @@ const BookingModal = ({ isOpen, onClose, muaData }: BookingModalProps) => {
             </select>
           </div>
 
-          {/* Calendar */}
           <div>
             <Label className="text-sm font-medium mb-2 block flex items-center">
               <CalendarIcon className="w-4 h-4 mr-1" />
@@ -122,7 +107,6 @@ const BookingModal = ({ isOpen, onClose, muaData }: BookingModalProps) => {
             </div>
           </div>
 
-          {/* Time Input */}
           <div>
             <Label htmlFor="time" className="text-sm font-medium mb-2 block flex items-center">
               <Clock className="w-4 h-4 mr-1" />
@@ -141,7 +125,6 @@ const BookingModal = ({ isOpen, onClose, muaData }: BookingModalProps) => {
             </p>
           </div>
 
-          {/* Selected Info */}
           {selectedDate && selectedTime && (
             <div className="bg-secondary/20 p-3 rounded-md">
               <p className="text-sm font-medium">Booking untuk:</p>
@@ -159,7 +142,6 @@ const BookingModal = ({ isOpen, onClose, muaData }: BookingModalProps) => {
             </div>
           )}
 
-          {/* Action Buttons */}
           <div className="flex space-x-3">
             <Button 
               variant="outline" 

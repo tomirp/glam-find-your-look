@@ -15,17 +15,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
 import { ArrowLeft, User, Star, MapPin, Phone, Instagram, Calendar as CalendarIcon, DollarSign, Settings, Save, PlusCircle, Upload, Eye, Clock, CheckCircle, X } from "lucide-react";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 
-// --- INTERFACE (diperbarui untuk data baru) ---
-interface MUAProfile {
+// --- INTERFACE ---
+export interface MUAProfileData {
   id: string;
   business_name: string | null;
   location_city: string;
@@ -36,6 +28,8 @@ interface MUAProfile {
   is_available: boolean | null;
   portfolio_images: string[] | null;
   profile_id: string;
+  // **PERBAIKAN DI SINI: Menambahkan kembali properti 'specializations'**
+  specializations: string[] | null;
 }
 
 interface UserProfile {
@@ -87,7 +81,7 @@ const MUAProfile = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const [muaProfile, setMuaProfile] = useState<MUAProfile | null>(null);
+  const [muaProfile, setMuaProfile] = useState<MUAProfileData | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [services, setServices] = useState<Service[]>([]);
@@ -95,15 +89,17 @@ const MUAProfile = () => {
   const [pageLoading, setPageLoading] = useState(true);
   
   const [editForm, setEditForm] = useState({ business_name: '', full_name: '', phone: '', location_city: '', location_address: '', bio: '' });
-
-  // State untuk mengontrol tab yang aktif
   const [activeTab, setActiveTab] = useState("dashboard");
   
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
 
-  // Fungsi untuk mengambil semua data dari Supabase
+  const [newService, setNewService] = useState({ name: '', description: '', price_min: 0, duration_minutes: 0 });
+  const [newServiceFile, setNewServiceFile] = useState<File | null>(null);
+  const [newServicePreview, setNewServicePreview] = useState<string | null>(null);
+  const [isAddingService, setIsAddingService] = useState(false);
+
   const fetchAllData = async () => {
     if (!user) return;
     setPageLoading(true);
@@ -129,7 +125,7 @@ const MUAProfile = () => {
         const { data: bookingsData } = await supabase.from('bookings').select(`id, booking_date, booking_time, status, total_price, customer_notes, profiles!bookings_customer_id_fkey(full_name), services(name)`).eq('mua_profile_id', muaData.id).order('booking_date', { ascending: false });
         setBookings(bookingsData || []);
 
-        const { data: servicesData, error: servicesError } = await supabase.from('services').select('id, name, price_min, price_max, duration_minutes, is_active, image_url').eq('mua_profile_id', muaData.id).order('name');
+        const { data: servicesData, error: servicesError } = await supabase.from('services').select('*').eq('mua_profile_id', muaData.id).order('name');
         if (servicesError) throw servicesError;
         setServices(servicesData || []);
       }
@@ -150,12 +146,8 @@ const MUAProfile = () => {
   }, [user]);
 
   const handleSignOut = async () => {
-    const { error } = await signOut();
-    if (error) {
-      toast({ title: "Gagal Keluar", description: error.message, variant: "destructive" });
-    } else {
-        navigate('/');
-    }
+    await signOut();
+    navigate('/');
   };
 
   const handleFileSelect = (event: ChangeEvent<HTMLInputElement>) => {
@@ -169,50 +161,95 @@ const MUAProfile = () => {
       reader.readAsDataURL(file);
     }
   };
-
+  
   const handleConfirmUpload = async () => {
     if (!selectedFile || !user || !muaProfile) return;
-    
     setUploading(true);
     toast({ description: "Mengunggah foto..." });
-    
     const fileExt = selectedFile.name.split('.').pop();
     const fileName = `${Date.now()}.${fileExt}`;
     const filePath = `${user.id}/${fileName}`;
-
     const { error: uploadError } = await supabase.storage.from('portfolio').upload(filePath, selectedFile);
-    
     if (uploadError) {
       toast({ title: "Gagal Unggah", description: uploadError.message, variant: "destructive" });
       setUploading(false);
       return;
     }
-
     const { data } = supabase.storage.from('portfolio').getPublicUrl(filePath);
     const updatedImages = [...(muaProfile.portfolio_images || []), data.publicUrl];
-    
     const { error: dbError } = await supabase.from('mua_profiles').update({ portfolio_images: updatedImages }).eq('id', muaProfile.id);
-    
     if (dbError) {
       toast({ title: "Gagal Simpan URL", description: dbError.message, variant: "destructive" });
     } else {
       toast({ title: "Berhasil", description: "Foto portofolio telah ditambahkan." });
       await fetchAllData();
     }
-
     setPreviewImage(null);
     setSelectedFile(null);
     setUploading(false);
+  };
+
+  const handleNewServiceChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setNewService(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleNewServiceFileSelect = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setNewServiceFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => setNewServicePreview(reader.result as string);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleAddNewService = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newServiceFile || !muaProfile || !user) {
+        toast({ title: "Data Tidak Lengkap", description: "Mohon isi semua field dan pilih gambar untuk layanan.", variant: "destructive" });
+        return;
+    }
+    setIsAddingService(true);
+    toast({ description: "Menambahkan layanan baru..." });
+    try {
+        const fileExt = newServiceFile.name.split('.').pop();
+        const fileName = `${Date.now()}.${fileExt}`;
+        const filePath = `${user.id}/${fileName}`;
+        const { error: uploadError } = await supabase.storage.from('services').upload(filePath, newServiceFile);
+        if (uploadError) throw uploadError;
+
+        const { data: urlData } = supabase.storage.from('services').getPublicUrl(filePath);
+        const { error: insertError } = await supabase.from('services').insert({
+            mua_profile_id: muaProfile.id,
+            name: newService.name,
+            description: newService.description,
+            price_min: newService.price_min,
+            duration_minutes: newService.duration_minutes,
+            image_url: urlData.publicUrl,
+            is_active: true
+        });
+        if (insertError) throw insertError;
+        
+        toast({ title: "Berhasil!", description: `Layanan "${newService.name}" telah ditambahkan.` });
+
+        setNewService({ name: '', description: '', price_min: 0, duration_minutes: 0 });
+        setNewServiceFile(null);
+        setNewServicePreview(null);
+        await fetchAllData();
+    } catch (error: any) {
+        toast({ title: "Gagal Menambahkan Layanan", description: error.message, variant: "destructive" });
+    } finally {
+        setIsAddingService(false);
+    }
   };
 
   const handleProfileUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userProfile) return;
     setPageLoading(true);
-    
     const { error: profileError } = await supabase.from('profiles').update({ full_name: editForm.full_name, phone: editForm.phone, bio: editForm.bio }).eq('id', userProfile.id);
     const { error: muaProfileError } = await supabase.from('mua_profiles').update({ business_name: editForm.business_name, location_city: editForm.location_city, location_address: editForm.location_address }).eq('profile_id', userProfile.id);
-
     if (profileError || muaProfileError) {
       toast({ title: "Error", description: profileError?.message || muaProfileError?.message || "Gagal memperbarui profil.", variant: "destructive" });
     } else {
@@ -252,7 +289,6 @@ const MUAProfile = () => {
                   {userProfile?.full_name?.charAt(0) || <User className="h-12 w-12" />}
                 </AvatarFallback>
               </Avatar>
-              
               <div className="flex-1 space-y-2">
                 <h1 className="text-3xl font-bold">{muaProfile?.business_name || userProfile?.full_name}</h1>
                 <div className="flex flex-wrap gap-4 text-white/90">
@@ -267,11 +303,8 @@ const MUAProfile = () => {
                     </div>
                   )}
                 </div>
-                {userProfile?.bio && (
-                  <p className="text-white/90 max-w-2xl">{userProfile.bio}</p>
-                )}
+                {userProfile?.bio && (<p className="text-white/90 max-w-2xl">{userProfile.bio}</p>)}
               </div>
-
               <div className="flex flex-col md:flex-row gap-4">
                 <div className="text-center bg-white/20 rounded-lg p-4 backdrop-blur-sm">
                   <div className="text-2xl font-bold">{muaProfile?.total_bookings || 0}</div>
@@ -292,18 +325,10 @@ const MUAProfile = () => {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <div className="bg-white rounded-lg shadow-sm border p-1">
             <TabsList className="grid w-full grid-cols-4 bg-transparent">
-              <TabsTrigger value="dashboard" className="data-[state=active]:bg-purple-100 data-[state=active]:text-purple-700">
-                Dashboard
-              </TabsTrigger>
-              <TabsTrigger value="layanan" className="data-[state=active]:bg-purple-100 data-[state=active]:text-purple-700">
-                Layanan & Portfolio
-              </TabsTrigger>
-              <TabsTrigger value="edit_profil" className="data-[state=active]:bg-purple-100 data-[state=active]:text-purple-700">
-                Edit Profil
-              </TabsTrigger>
-              <TabsTrigger value="jadwal" className="data-[state=active]:bg-purple-100 data-[state=active]:text-purple-700">
-                Jadwal
-              </TabsTrigger>
+              <TabsTrigger value="dashboard" className="data-[state=active]:bg-purple-100 data-[state=active]:text-purple-700">Dashboard</TabsTrigger>
+              <TabsTrigger value="layanan" className="data-[state=active]:bg-purple-100 data-[state=active]:text-purple-700">Layanan & Portfolio</TabsTrigger>
+              <TabsTrigger value="edit_profil" className="data-[state=active]:bg-purple-100 data-[state=active]:text-purple-700">Edit Profil</TabsTrigger>
+              <TabsTrigger value="jadwal" className="data-[state=active]:bg-purple-100 data-[state=active]:text-purple-700">Jadwal</TabsTrigger>
             </TabsList>
           </div>
           
@@ -325,9 +350,7 @@ const MUAProfile = () => {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-gray-600">Pendapatan Bulan Ini</p>
-                      <p className="text-3xl font-bold text-green-600">
-                        {formatCurrency(bookings.filter(b => new Date(b.booking_date).getMonth() === new Date().getMonth() && b.status === 'completed').reduce((sum, b) => sum + b.total_price, 0))}
-                      </p>
+                      <p className="text-3xl font-bold text-green-600">{formatCurrency(bookings.filter(b => new Date(b.booking_date).getMonth() === new Date().getMonth() && b.status === 'completed').reduce((sum, b) => sum + b.total_price, 0))}</p>
                     </div>
                     <DollarSign className="h-12 w-12 text-green-500/50" />
                   </div>
@@ -359,26 +382,17 @@ const MUAProfile = () => {
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
                           <h4 className="font-medium">{booking.profiles?.full_name}</h4>
-                          <Badge className={`${getStatusColor(booking.status)} border-0`}>
-                            {booking.status}
-                          </Badge>
+                          <Badge className={`${getStatusColor(booking.status)} border-0`}>{booking.status}</Badge>
                         </div>
                         <p className="text-sm text-gray-600">{booking.services?.name}</p>
-                        <p className="text-xs text-gray-500">
-                          {new Date(booking.booking_date).toLocaleDateString('id-ID')} • {booking.booking_time}
-                        </p>
+                        <p className="text-xs text-gray-500">{new Date(booking.booking_date).toLocaleDateString('id-ID')} • {booking.booking_time}</p>
                       </div>
                       <div className="text-right">
                         <p className="font-semibold text-purple-600">{formatCurrency(booking.total_price)}</p>
                       </div>
                     </div>
                   ))}
-                  {bookings.length === 0 && (
-                    <div className="text-center py-12 text-gray-500">
-                      <CalendarIcon className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                      <p>Belum ada pesanan</p>
-                    </div>
-                  )}
+                  {bookings.length === 0 && (<div className="text-center py-12 text-gray-500"><CalendarIcon className="h-12 w-12 mx-auto mb-4 opacity-50" /><p>Belum ada pesanan</p></div>)}
                 </div>
               </CardContent>
             </Card>
@@ -387,113 +401,69 @@ const MUAProfile = () => {
           <TabsContent value="layanan" className="space-y-6">
             <Card className="border-0 shadow-lg">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Eye className="h-5 w-5 text-purple-600" />
-                  Galeri Portfolio
-                </CardTitle>
+                <CardTitle className="flex items-center gap-2"><Eye className="h-5 w-5 text-purple-600" />Galeri Portfolio</CardTitle>
                 <CardDescription>Pamerkan karya terbaik Anda untuk menarik lebih banyak klien.</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                  {(muaProfile?.portfolio_images || []).map((url, index) => (
-                    <div key={index} className="relative aspect-square group">
-                      <img 
-                        src={url} 
-                        alt={`Portfolio ${index+1}`} 
-                        className="w-full h-full object-cover rounded-lg shadow-md group-hover:shadow-lg transition-shadow" 
-                      />
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors rounded-lg" />
-                    </div>
-                  ))}
-                  {previewImage ? (
-                    <div className="relative aspect-square group col-span-full md:col-span-1 border-2 border-dashed border-purple-200 rounded-lg p-2">
-                        <img src={previewImage} alt="Pratinjau" className="w-full h-full object-cover rounded-md" />
-                        <Button
-                            variant="destructive"
-                            size="icon"
-                            className="absolute -top-3 -right-3 h-7 w-7 rounded-full"
-                            onClick={() => { setPreviewImage(null); setSelectedFile(null); }}
-                        >
-                            <X className="h-4 w-4" />
-                        </Button>
-                    </div>
-                  ) : (
-                    (muaProfile?.portfolio_images || []).length === 0 && (
-                      <div className="col-span-full text-center py-12 text-gray-500 border-2 border-dashed border-gray-200 rounded-lg">
-                        <Upload className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                        <p>Belum ada foto portfolio</p>
-                      </div>
-                    )
-                  )}
+                  {(muaProfile?.portfolio_images || []).map((url, index) => (<div key={index} className="relative aspect-square group"><img src={url} alt={`Portfolio ${index+1}`} className="w-full h-full object-cover rounded-lg shadow-md group-hover:shadow-lg transition-shadow" /><div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors rounded-lg" /></div>))}
+                  {previewImage && (<div className="relative aspect-square group col-span-full md:col-span-1 border-2 border-dashed border-purple-200 rounded-lg p-2"><img src={previewImage} alt="Pratinjau" className="w-full h-full object-cover rounded-md" /><Button variant="destructive" size="icon" className="absolute -top-3 -right-3 h-7 w-7 rounded-full" onClick={() => { setPreviewImage(null); setSelectedFile(null); }}><X className="h-4 w-4" /></Button></div>)}
+                  {(muaProfile?.portfolio_images || []).length === 0 && !previewImage && (<div className="col-span-full text-center py-12 text-gray-500 border-2 border-dashed border-gray-200 rounded-lg"><Upload className="h-12 w-12 mx-auto mb-4 opacity-50" /><p>Belum ada foto portfolio</p></div>)}
                 </div>
                 <div className="flex items-center gap-4">
                   <Label htmlFor="portfolio-upload" className="cursor-pointer">
-                    <Button asChild variant="outline" className="border-purple-200 hover:bg-purple-50">
-                      <span className="flex items-center gap-2">
-                        <Upload className="h-4 w-4"/> 
-                        {previewImage ? 'Ganti Foto' : 'Pilih Foto'}
-                      </span>
-                    </Button>
+                    <Button asChild variant="outline" className="border-purple-200 hover:bg-purple-50"><span className="flex items-center gap-2"><Upload className="h-4 w-4"/>{previewImage ? 'Ganti Foto' : 'Pilih Foto'}</span></Button>
                   </Label>
                   <Input id="portfolio-upload" type="file" className="hidden" accept="image/*" onChange={handleFileSelect} />
-
-                  {previewImage && (
-                    <Button 
-                        onClick={handleConfirmUpload} 
-                        disabled={uploading}
-                        className="bg-purple-600 hover:bg-purple-700"
-                    >
-                      {uploading ? 'Mengunggah...' : 'Unggah Sekarang'}
-                    </Button>
-                  )}
+                  {previewImage && (<Button onClick={handleConfirmUpload} disabled={uploading} className="bg-purple-600 hover:bg-purple-700">{uploading ? 'Mengunggah...' : 'Unggah Sekarang'}</Button>)}
                 </div>
               </CardContent>
             </Card>
             <Card className="border-0 shadow-lg">
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <Star className="h-5 w-5 text-purple-600" />
-                    Layanan Makeup
-                  </CardTitle>
-                  <CardDescription>Kelola paket layanan dan harga Anda</CardDescription>
-                </div>
-                <Button className="bg-purple-600 hover:bg-purple-700">
-                  <PlusCircle className="h-4 w-4 mr-2"/> 
-                  Tambah Layanan
-                </Button>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Star className="h-5 w-5 text-purple-600" />Layanan Makeup</CardTitle>
+                <CardDescription>Kelola paket layanan dan harga yang Anda tawarkan.</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid gap-4">
-                  {services.map(service => (
-                    <div key={service.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-1">
-                          <h4 className="font-medium">{service.name}</h4>
-                          <Badge variant={service.is_active ? "default" : "secondary"}>
-                            {service.is_active ? "Aktif" : "Nonaktif"}
-                          </Badge>
-                        </div>
-                        <p className="text-sm text-gray-600">
-                          {formatCurrency(service.price_min)} 
-                          {service.price_max && ` - ${formatCurrency(service.price_max)}`}
-                        </p>
-                        {service.duration_minutes && (
-                          <p className="text-xs text-gray-500">{service.duration_minutes} menit</p>
-                        )}
+                <div className="grid gap-4 mb-8">
+                  {services.map(service => (<div key={service.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                    <div className="flex items-center gap-4">
+                      <img src={service.image_url || '/placeholder.svg'} alt={service.name} className="h-16 w-16 rounded-md object-cover"/>
+                      <div>
+                        <h4 className="font-medium">{service.name}</h4>
+                        <p className="text-sm text-purple-600 font-semibold">{formatCurrency(service.price_min)}</p>
+                        <Badge variant={service.is_active ? "default" : "secondary"}>{service.is_active ? "Aktif" : "Nonaktif"}</Badge>
                       </div>
-                      <Button variant="ghost" size="sm">
-                        Edit
-                      </Button>
                     </div>
-                  ))}
-                  {services.length === 0 && (
-                    <div className="text-center py-12 text-gray-500">
-                      <Star className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                      <p>Belum ada layanan ditambahkan</p>
-                    </div>
-                  )}
+                    <Button variant="ghost" size="sm">Edit</Button>
+                  </div>))}
+                  {services.length === 0 && (<div className="text-center py-12 text-gray-500"><Star className="h-12 w-12 mx-auto mb-4 opacity-50" /><p>Belum ada layanan ditambahkan</p></div>)}
                 </div>
+                <Card className="bg-purple-50/60 border-purple-200">
+                  <CardHeader><CardTitle className="text-lg">Tambah Jasa Baru</CardTitle></CardHeader>
+                  <CardContent>
+                    <form onSubmit={handleAddNewService} className="space-y-4">
+                      <div className="flex flex-col md:flex-row gap-6">
+                        <div className="flex-1 space-y-4">
+                          <div className="space-y-1"><Label htmlFor="name">Nama Jasa</Label><Input id="name" name="name" value={newService.name} onChange={handleNewServiceChange} placeholder="cth: Makeup Wisuda" required /></div>
+                          <div className="space-y-1"><Label htmlFor="description">Deskripsi Singkat</Label><Textarea id="description" name="description" value={newService.description} onChange={handleNewServiceChange} placeholder="Tahan lama, flawless, dll." required /></div>
+                          <div className="flex gap-4">
+                            <div className="space-y-1 w-1/2"><Label htmlFor="price_min">Harga (Rp)</Label><Input id="price_min" name="price_min" type="number" value={newService.price_min} onChange={handleNewServiceChange} required /></div>
+                            <div className="space-y-1 w-1/2"><Label htmlFor="duration_minutes">Durasi (menit)</Label><Input id="duration_minutes" name="duration_minutes" type="number" value={newService.duration_minutes} onChange={handleNewServiceChange} required /></div>
+                          </div>
+                        </div>
+                        <div className="flex-1">
+                          <Label>Foto Layanan</Label>
+                          <div className="mt-1 aspect-video border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center bg-white">
+                            {newServicePreview ? (<img src={newServicePreview} alt="Pratinjau layanan" className="h-full w-full object-cover rounded-md" />) : (<div className="text-center text-gray-500"><Upload className="mx-auto h-8 w-8" /><p className="text-sm">Pilih gambar</p></div>)}
+                          </div>
+                          <Input id="service-image-upload" type="file" className="mt-2" accept="image/*" onChange={handleNewServiceFileSelect} required/>
+                        </div>
+                      </div>
+                      <div className="flex justify-end"><Button type="submit" disabled={isAddingService} className="bg-purple-600 hover:bg-purple-700">{isAddingService ? "Menyimpan..." : "Simpan Jasa"}<Save className="h-4 w-4 ml-2" /></Button></div>
+                    </form>
+                  </CardContent>
+                </Card>
               </CardContent>
             </Card>
           </TabsContent>
@@ -501,78 +471,20 @@ const MUAProfile = () => {
           <TabsContent value="edit_profil">
             <Card className="border-0 shadow-lg">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Settings className="h-5 w-5 text-purple-600" />
-                  Edit Profil
-                </CardTitle>
+                <CardTitle className="flex items-center gap-2"><Settings className="h-5 w-5 text-purple-600" />Edit Profil</CardTitle>
                 <CardDescription>Update informasi profil dan bisnis Anda</CardDescription>
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleProfileUpdate} className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <Label htmlFor="business_name">Nama Bisnis</Label>
-                      <Input 
-                        id="business_name" 
-                        value={editForm.business_name} 
-                        onChange={(e) => setEditForm({...editForm, business_name: e.target.value})}
-                        className="border-gray-200 focus:border-purple-400"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="full_name">Nama Lengkap</Label>
-                      <Input 
-                        id="full_name" 
-                        value={editForm.full_name} 
-                        onChange={(e) => setEditForm({...editForm, full_name: e.target.value})}
-                        className="border-gray-200 focus:border-purple-400"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="phone">Nomor Telepon</Label>
-                      <Input 
-                        id="phone" 
-                        value={editForm.phone} 
-                        onChange={(e) => setEditForm({...editForm, phone: e.target.value})}
-                        className="border-gray-200 focus:border-purple-400"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="location_city">Kota</Label>
-                      <Input 
-                        id="location_city" 
-                        value={editForm.location_city} 
-                        onChange={(e) => setEditForm({...editForm, location_city: e.target.value})}
-                        className="border-gray-200 focus:border-purple-400"
-                      />
-                    </div>
+                    <div className="space-y-2"><Label htmlFor="business_name">Nama Bisnis</Label><Input id="business_name" value={editForm.business_name} onChange={(e) => setEditForm({...editForm, business_name: e.target.value})} className="border-gray-200 focus:border-purple-400"/></div>
+                    <div className="space-y-2"><Label htmlFor="full_name">Nama Lengkap</Label><Input id="full_name" value={editForm.full_name} onChange={(e) => setEditForm({...editForm, full_name: e.target.value})} className="border-gray-200 focus:border-purple-400"/></div>
+                    <div className="space-y-2"><Label htmlFor="phone">Nomor Telepon</Label><Input id="phone" value={editForm.phone} onChange={(e) => setEditForm({...editForm, phone: e.target.value})} className="border-gray-200 focus:border-purple-400"/></div>
+                    <div className="space-y-2"><Label htmlFor="location_city">Kota</Label><Input id="location_city" value={editForm.location_city} onChange={(e) => setEditForm({...editForm, location_city: e.target.value})} className="border-gray-200 focus:border-purple-400"/></div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="location_address">Alamat Lengkap</Label>
-                    <Textarea 
-                      id="location_address" 
-                      value={editForm.location_address} 
-                      onChange={(e) => setEditForm({...editForm, location_address: e.target.value})}
-                      placeholder="Jalan, nomor, kelurahan, kecamatan..."
-                      className="border-gray-200 focus:border-purple-400"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="bio">Bio / Deskripsi</Label>
-                    <Textarea 
-                      id="bio" 
-                      value={editForm.bio} 
-                      onChange={(e) => setEditForm({...editForm, bio: e.target.value})}
-                      placeholder="Ceritakan tentang keahlian dan pengalaman Anda..."
-                      className="border-gray-200 focus:border-purple-400"
-                    />
-                  </div>
-                  <div className="flex justify-end">
-                    <Button type="submit" className="bg-purple-600 hover:bg-purple-700">
-                      <Save className="h-4 w-4 mr-2" />
-                      Simpan Perubahan
-                    </Button>
-                  </div>
+                  <div className="space-y-2"><Label htmlFor="location_address">Alamat Lengkap</Label><Textarea id="location_address" value={editForm.location_address} onChange={(e) => setEditForm({...editForm, location_address: e.target.value})} placeholder="Jalan, nomor, kelurahan, kecamatan..." className="border-gray-200 focus:border-purple-400"/></div>
+                  <div className="space-y-2"><Label htmlFor="bio">Bio / Deskripsi</Label><Textarea id="bio" value={editForm.bio} onChange={(e) => setEditForm({...editForm, bio: e.target.value})} placeholder="Ceritakan tentang keahlian dan pengalaman Anda..." className="border-gray-200 focus:border-purple-400"/></div>
+                  <div className="flex justify-end"><Button type="submit" className="bg-purple-600 hover:bg-purple-700"><Save className="h-4 w-4 mr-2" />Simpan Perubahan</Button></div>
                 </form>
               </CardContent>
             </Card>
@@ -581,27 +493,13 @@ const MUAProfile = () => {
           <TabsContent value="jadwal">
             <Card className="border-0 shadow-lg">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <CalendarIcon className="h-5 w-5 text-purple-600" />
-                  Atur Ketersediaan
-                </CardTitle>
+                <CardTitle className="flex items-center gap-2"><CalendarIcon className="h-5 w-5 text-purple-600" />Atur Ketersediaan</CardTitle>
                 <CardDescription>Kelola jadwal dan ketersediaan Anda</CardDescription>
               </CardHeader>
               <CardContent className="flex justify-center">
-                <Calendar 
-                  mode="multiple" 
-                  selected={unavailableDates} 
-                  onSelect={setUnavailableDates} 
-                  disabled={(date) => date < new Date(new Date().setDate(new Date().getDate() - 1))} 
-                  className="p-0 border rounded-lg" 
-                />
+                <Calendar mode="multiple" selected={unavailableDates} onSelect={setUnavailableDates} disabled={(date) => date < new Date(new Date().setDate(new Date().getDate() - 1))} className="p-0 border rounded-lg" />
               </CardContent>
-              <div className="p-6 pt-0 flex justify-end">
-                <Button className="bg-purple-600 hover:bg-purple-700">
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  Simpan Jadwal
-                </Button>
-              </div>
+              <div className="p-6 pt-0 flex justify-end"><Button className="bg-purple-600 hover:bg-purple-700"><CheckCircle className="h-4 w-4 mr-2" />Simpan Jadwal</Button></div>
             </Card>
           </TabsContent>
         </Tabs>

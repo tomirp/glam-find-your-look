@@ -1,53 +1,40 @@
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import MUACard from "./MUACard";
+import MUACard, { MUAProfileForCard } from "./MUACard";
+import { supabase } from "@/integrations/supabase/client";
 
 const PopularMUASection = () => {
-  const popularMUAs = [
-    {
-      id: "5",
-      name: "Luna Beauty Expert",
-      rating: 5.0,
-      reviews: 342,
-      location: "Menteng",
-      distance: "5.2 km",
-      specialty: "Celebrity & Red Carpet",
-      price: "Rp 800.000",
-      isPopular: true
-    },
-    {
-      id: "6",
-      name: "Aesthetic by Vina",
-      rating: 4.9,
-      reviews: 289,
-      location: "Kelapa Gading",
-      distance: "7.8 km",
-      specialty: "Bridal & Pre-wedding",
-      price: "Rp 600.000",
-      isPopular: true
-    },
-    {
-      id: "7",
-      name: "Glam Studio Jakarta",
-      rating: 4.8,
-      reviews: 445,
-      location: "PIK",
-      distance: "12.3 km",
-      specialty: "Party & Event Makeup",
-      price: "Rp 350.000",
-      isPopular: true
-    },
-    {
-      id: "8",
-      name: "Beauty by Andira",
-      rating: 4.9,
-      reviews: 178,
-      location: "Bintaro",
-      distance: "8.5 km",
-      specialty: "Natural & Soft Glam",
-      price: "Rp 275.000",
-      isPopular: true
-    }
-  ];
+  const [popularMUAs, setPopularMUAs] = useState<MUAProfileForCard[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchPopularMUAs = async () => {
+      setLoading(true);
+      // Mengambil MUA dan mengurutkannya berdasarkan rating tertinggi
+      const { data, error } = await supabase
+        .from("mua_profiles")
+        .select(`
+          id,
+          business_name,
+          rating,
+          total_reviews,
+          location_city,
+          specializations,
+          price_range
+        `)
+        .order('rating', { ascending: false, nullsFirst: false })
+        .limit(4);
+
+      if (error) {
+        console.error("Error fetching popular MUAs:", error);
+      } else {
+        setPopularMUAs(data || []);
+      }
+      setLoading(false);
+    };
+
+    fetchPopularMUAs();
+  }, []);
 
   return (
     <section className="py-16 bg-background">
@@ -56,13 +43,17 @@ const PopularMUASection = () => {
           Jasa Make-Up Populer
         </h2>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {popularMUAs.map((mua) => (
-            <Link key={mua.id} to={`/mua/${mua.id}`}>
-              <MUACard {...mua} />
-            </Link>
-          ))}
-        </div>
+        {loading ? (
+          <p className="text-center">Memuat MUA populer...</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {popularMUAs.map((mua) => (
+              <Link key={mua.id} to={`/mua/${mua.id}`}>
+                <MUACard {...mua} isPopular={true} />
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );

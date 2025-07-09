@@ -1,49 +1,39 @@
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import MUACard from "./MUACard";
+import MUACard, { MUAProfileForCard } from "./MUACard";
+import { supabase } from "@/integrations/supabase/client";
 
 const NearbyMUASection = () => {
-  const nearbyMUAs = [
-    {
-      id: "1",
-      name: "Sarah Makeup Artist",
-      rating: 4.8,
-      reviews: 127,
-      location: "Kemang",
-      distance: "2.5 km",
-      specialty: "Bridal & Party Makeup",
-      price: "Rp 300.000"
-    },
-    {
-      id: "2",
-      name: "Maya Beauty Studio",
-      rating: 4.9,
-      reviews: 89,
-      location: "Pondok Indah",
-      distance: "3.1 km",
-      specialty: "Korean & Natural Look",
-      price: "Rp 250.000"
-    },
-    {
-      id: "3",
-      name: "Dinda MUA",
-      rating: 4.7,
-      reviews: 156,
-      location: "Cipete",
-      distance: "1.8 km",
-      specialty: "Graduation & Photoshoot",
-      price: "Rp 200.000"
-    },
-    {
-      id: "4",
-      name: "Rika Professional",
-      rating: 4.9,
-      reviews: 203,
-      location: "Senayan",
-      distance: "4.2 km",
-      specialty: "Editorial & Fashion",
-      price: "Rp 400.000"
-    }
-  ];
+  const [nearbyMUAs, setNearbyMUAs] = useState<MUAProfileForCard[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchNearbyMUAs = async () => {
+      setLoading(true);
+      // Mengambil 4 MUA secara acak sebagai simulasi "terdekat"
+      const { data, error } = await supabase
+        .from("mua_profiles")
+        .select(`
+          id,
+          business_name,
+          rating,
+          total_reviews,
+          location_city,
+          specializations,
+          price_range
+        `)
+        .limit(4);
+
+      if (error) {
+        console.error("Error fetching nearby MUAs:", error);
+      } else {
+        setNearbyMUAs(data || []);
+      }
+      setLoading(false);
+    };
+
+    fetchNearbyMUAs();
+  }, []);
 
   return (
     <section className="py-16 bg-secondary/20">
@@ -52,13 +42,17 @@ const NearbyMUASection = () => {
           MUA yang Dekat Dengan Anda
         </h2>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {nearbyMUAs.map((mua) => (
-            <Link key={mua.id} to={`/mua/${mua.id}`}>
-              <MUACard {...mua} />
-            </Link>
-          ))}
-        </div>
+        {loading ? (
+          <p className="text-center">Memuat MUA terdekat...</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {nearbyMUAs.map((mua) => (
+              <Link key={mua.id} to={`/mua/${mua.id}`}>
+                <MUACard {...mua} />
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );
