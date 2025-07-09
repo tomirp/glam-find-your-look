@@ -10,18 +10,9 @@ const PopularMUASection = () => {
   useEffect(() => {
     const fetchPopularMUAs = async () => {
       setLoading(true);
-      // Mengambil MUA dan mengurutkannya berdasarkan rating tertinggi
       const { data, error } = await supabase
         .from("mua_profiles")
-        .select(`
-          id,
-          business_name,
-          rating,
-          total_reviews,
-          location_city,
-          specializations,
-          price_range
-        `)
+        .select(`id, business_name, rating, total_reviews, location_city, specializations, price_range, cover_image_url`)
         .order('rating', { ascending: false, nullsFirst: false })
         .limit(4);
 
@@ -32,7 +23,6 @@ const PopularMUASection = () => {
       }
       setLoading(false);
     };
-
     fetchPopularMUAs();
   }, []);
 
@@ -42,15 +32,12 @@ const PopularMUASection = () => {
         <h2 className="text-3xl md:text-4xl font-bold text-center text-foreground mb-12 font-heading">
           Jasa Make-Up Populer
         </h2>
-        
         {loading ? (
           <p className="text-center">Memuat MUA populer...</p>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {popularMUAs.map((mua) => (
-              <Link key={mua.id} to={`/mua/${mua.id}`}>
-                <MUACard {...mua} isPopular={true} />
-              </Link>
+              <Link key={mua.id} to={`/mua/${mua.id}`}><MUACard {...mua} isPopular={true} /></Link>
             ))}
           </div>
         )}
@@ -58,5 +45,4 @@ const PopularMUASection = () => {
     </section>
   );
 };
-
 export default PopularMUASection;

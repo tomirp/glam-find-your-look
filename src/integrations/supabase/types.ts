@@ -82,6 +82,7 @@ export type Database = {
           bank_account_number: string | null
           bank_name: string | null
           business_name: string | null
+          cover_image_url: string | null // Ditambahkan
           created_at: string
           experience_years: number | null
           id: string
@@ -104,6 +105,7 @@ export type Database = {
           bank_account_number?: string | null
           bank_name?: string | null
           business_name?: string | null
+          cover_image_url?: string | null // Ditambahkan
           created_at?: string
           experience_years?: number | null
           id?: string
@@ -126,6 +128,7 @@ export type Database = {
           bank_account_number?: string | null
           bank_name?: string | null
           business_name?: string | null
+          cover_image_url?: string | null // Ditambahkan
           created_at?: string
           experience_years?: number | null
           id?: string

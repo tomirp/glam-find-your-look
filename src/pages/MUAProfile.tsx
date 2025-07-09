@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 // Import komponen UI yang dibutuhkan
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -14,7 +15,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
-import { ArrowLeft, User, Star, MapPin, Phone, Instagram, Calendar as CalendarIcon, DollarSign, Settings, Save, PlusCircle, Upload, Eye, Clock, CheckCircle, X } from "lucide-react";
+import { ArrowLeft, User, Star, MapPin, Phone, Trash2, Calendar as CalendarIcon, DollarSign, Settings, Save, PlusCircle, Upload, Eye, Clock, CheckCircle, X, Edit, Image as ImageIcon } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+
 
 // --- INTERFACE ---
 export interface MUAProfileData {
@@ -28,8 +41,8 @@ export interface MUAProfileData {
   is_available: boolean | null;
   portfolio_images: string[] | null;
   profile_id: string;
-  // **PERBAIKAN DI SINI: Menambahkan kembali properti 'specializations'**
   specializations: string[] | null;
+  cover_image_url: string | null;
 }
 
 interface UserProfile {
@@ -54,6 +67,7 @@ interface Booking {
 interface Service {
   id: string;
   name: string;
+  description: string | null;
   price_min: number;
   price_max: number | null;
   duration_minutes: number | null;
@@ -99,6 +113,11 @@ const MUAProfile = () => {
   const [newServiceFile, setNewServiceFile] = useState<File | null>(null);
   const [newServicePreview, setNewServicePreview] = useState<string | null>(null);
   const [isAddingService, setIsAddingService] = useState(false);
+  
+  const [editingService, setEditingService] = useState<Service | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editServiceFile, setEditServiceFile] = useState<File | null>(null);
+  const [editServicePreview, setEditServicePreview] = useState<string | null>(null);
 
   const fetchAllData = async () => {
     if (!user) return;
@@ -188,6 +207,72 @@ const MUAProfile = () => {
     setSelectedFile(null);
     setUploading(false);
   };
+  
+  const handleDeletePortfolioImage = async (imageUrl: string) => {
+    if (!user || !muaProfile) return;
+    toast({ description: "Menghapus foto..." });
+    try {
+      const url = new URL(imageUrl);
+      const filePath = url.pathname.split(`/portfolio/`)[1];
+      const { error: storageError } = await supabase.storage.from('portfolio').remove([filePath]);
+      if (storageError) throw storageError;
+      const updatedImages = muaProfile.portfolio_images?.filter(img => img !== imageUrl) || [];
+      const { error: dbError } = await supabase.from('mua_profiles').update({ portfolio_images: updatedImages }).eq('id', muaProfile.id);
+      if (dbError) throw dbError;
+      toast({ title: "Berhasil", description: "Foto telah dihapus." });
+      await fetchAllData();
+    } catch (error: any) {
+      toast({ title: "Gagal Menghapus", description: error.message, variant: "destructive" });
+    }
+  };
+
+  const handleSetCoverImage = async (imageUrl: string) => {
+    if (!muaProfile) return;
+    toast({ description: "Menyimpan foto utama..." });
+    try {
+        const { error } = await supabase
+            .from('mua_profiles')
+            .update({ cover_image_url: imageUrl })
+            .eq('id', muaProfile.id);
+
+        if (error) throw error;
+        toast({ title: "Berhasil!", description: "Foto utama telah diperbarui." });
+        await fetchAllData();
+    } catch (error: any) {
+        toast({ title: "Gagal", description: error.message, variant: "destructive" });
+    }
+  };
+
+  const handleAvatarUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+    if (!event.target.files || event.target.files.length === 0 || !user) {
+      return;
+    }
+    const file = event.target.files[0];
+    const fileExt = file.name.split('.').pop();
+    const filePath = `${user.id}/avatar.${fileExt}`;
+
+    toast({ description: "Mengunggah foto profil..." });
+    try {
+      const { error: uploadError } = await supabase.storage.from('avatars').upload(filePath, file, { upsert: true });
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(filePath);
+      const publicUrl = `${urlData.publicUrl}?t=${new Date().getTime()}`;
+
+      const { error: dbError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: publicUrl })
+        .eq('user_id', user.id);
+      
+      if (dbError) throw dbError;
+
+      toast({ title: "Berhasil!", description: "Foto profil telah diperbarui." });
+      await fetchAllData();
+
+    } catch (error: any) {
+      toast({ title: "Gagal", description: error.message, variant: "destructive" });
+    }
+  };
 
   const handleNewServiceChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -218,7 +303,6 @@ const MUAProfile = () => {
         const filePath = `${user.id}/${fileName}`;
         const { error: uploadError } = await supabase.storage.from('services').upload(filePath, newServiceFile);
         if (uploadError) throw uploadError;
-
         const { data: urlData } = supabase.storage.from('services').getPublicUrl(filePath);
         const { error: insertError } = await supabase.from('services').insert({
             mua_profile_id: muaProfile.id,
@@ -230,9 +314,7 @@ const MUAProfile = () => {
             is_active: true
         });
         if (insertError) throw insertError;
-        
         toast({ title: "Berhasil!", description: `Layanan "${newService.name}" telah ditambahkan.` });
-
         setNewService({ name: '', description: '', price_min: 0, duration_minutes: 0 });
         setNewServiceFile(null);
         setNewServicePreview(null);
@@ -241,6 +323,70 @@ const MUAProfile = () => {
         toast({ title: "Gagal Menambahkan Layanan", description: error.message, variant: "destructive" });
     } finally {
         setIsAddingService(false);
+    }
+  };
+
+  const handleOpenEditModal = (service: Service) => {
+    setEditingService(service);
+    setEditServicePreview(service.image_url);
+    setIsEditModalOpen(true);
+  };
+  
+  const handleEditServiceChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    if (!editingService) return;
+    const { name, value } = e.target;
+    setEditingService({ ...editingService, [name]: value });
+  };
+  
+  const handleEditServiceFileSelect = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setEditServiceFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => setEditServicePreview(reader.result as string);
+      reader.readAsDataURL(file);
+    }
+  };
+  
+  const handleUpdateService = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingService || !user) return;
+    setIsAddingService(true);
+    toast({ description: "Memperbarui layanan..." });
+    try {
+      let imageUrl = editingService.image_url;
+      if (editServiceFile) {
+        if (editingService.image_url) {
+          const oldUrl = new URL(editingService.image_url);
+          const oldFilePath = oldUrl.pathname.split(`/services/`)[1];
+          await supabase.storage.from('services').remove([oldFilePath]);
+        }
+        const fileExt = editServiceFile.name.split('.').pop();
+        const fileName = `${Date.now()}.${fileExt}`;
+        const filePath = `${user.id}/${fileName}`;
+        const { error: uploadError } = await supabase.storage.from('services').upload(filePath, editServiceFile);
+        if (uploadError) throw uploadError;
+        const { data: urlData } = supabase.storage.from('services').getPublicUrl(filePath);
+        imageUrl = urlData.publicUrl;
+      }
+      const { error: updateError } = await supabase
+        .from('services')
+        .update({
+          name: editingService.name,
+          description: editingService.description,
+          price_min: editingService.price_min,
+          duration_minutes: editingService.duration_minutes,
+          image_url: imageUrl
+        })
+        .eq('id', editingService.id);
+      if (updateError) throw updateError;
+      toast({ title: "Berhasil!", description: "Layanan telah diperbarui." });
+      setIsEditModalOpen(false);
+      await fetchAllData();
+    } catch (error: any) {
+      toast({ title: "Gagal Memperbarui", description: error.message, variant: "destructive" });
+    } finally {
+      setIsAddingService(false);
     }
   };
 
@@ -283,12 +429,18 @@ const MUAProfile = () => {
         <Card className="mb-8 overflow-hidden border-0 shadow-lg bg-gradient-to-r from-purple-600 to-pink-600">
           <CardContent className="p-8 text-white">
             <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
-              <Avatar className="h-24 w-24 border-4 border-white shadow-lg">
-                <AvatarImage src={userProfile?.avatar_url || ''} />
-                <AvatarFallback className="bg-white text-purple-600 text-2xl font-bold">
-                  {userProfile?.full_name?.charAt(0) || <User className="h-12 w-12" />}
-                </AvatarFallback>
-              </Avatar>
+              <div className="relative group">
+                <Avatar className="h-24 w-24 border-4 border-white shadow-lg">
+                  <AvatarImage src={userProfile?.avatar_url || ''} />
+                  <AvatarFallback className="bg-white text-purple-600 text-2xl font-bold">
+                    {userProfile?.full_name?.charAt(0) || <User className="h-12 w-12" />}
+                  </AvatarFallback>
+                </Avatar>
+                <Label htmlFor="avatar-upload" className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                  <Edit className="h-8 w-8 text-white" />
+                </Label>
+                <Input id="avatar-upload" type="file" className="hidden" accept="image/*" onChange={handleAvatarUpload} />
+              </div>
               <div className="flex-1 space-y-2">
                 <h1 className="text-3xl font-bold">{muaProfile?.business_name || userProfile?.full_name}</h1>
                 <div className="flex flex-wrap gap-4 text-white/90">
@@ -402,11 +554,28 @@ const MUAProfile = () => {
             <Card className="border-0 shadow-lg">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2"><Eye className="h-5 w-5 text-purple-600" />Galeri Portfolio</CardTitle>
-                <CardDescription>Pamerkan karya terbaik Anda untuk menarik lebih banyak klien.</CardDescription>
+                <CardDescription>Pilih foto, lalu klik ikon gambar untuk menjadikannya foto utama.</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                  {(muaProfile?.portfolio_images || []).map((url, index) => (<div key={index} className="relative aspect-square group"><img src={url} alt={`Portfolio ${index+1}`} className="w-full h-full object-cover rounded-lg shadow-md group-hover:shadow-lg transition-shadow" /><div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors rounded-lg" /></div>))}
+                  {(muaProfile?.portfolio_images || []).map((url, index) => (<div key={index} className="relative aspect-square group">
+                    {muaProfile?.cover_image_url === url && (<div className="absolute inset-0 ring-4 ring-purple-500 rounded-lg pointer-events-none z-10"><Badge className="absolute top-2 left-2">Utama</Badge></div>)}
+                    <img src={url} alt={`Portfolio ${index+1}`} className="w-full h-full object-cover rounded-lg shadow-md" />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors rounded-lg flex items-center justify-center gap-2">
+                        <Button variant="outline" size="icon" className="h-10 w-10 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => handleSetCoverImage(url)}>
+                            <ImageIcon className="h-5 w-5" />
+                        </Button>
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <Button variant="destructive" size="icon" className="h-10 w-10 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="h-5 w-5" /></Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                                <AlertDialogHeader><AlertDialogTitle>Anda Yakin?</AlertDialogTitle><AlertDialogDescription>Tindakan ini tidak dapat diurungkan. Foto akan dihapus permanen.</AlertDialogDescription></AlertDialogHeader>
+                                <AlertDialogFooter><AlertDialogCancel>Batal</AlertDialogCancel><AlertDialogAction onClick={() => handleDeletePortfolioImage(url)}>Ya, Hapus</AlertDialogAction></AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+                    </div>
+                  </div>))}
                   {previewImage && (<div className="relative aspect-square group col-span-full md:col-span-1 border-2 border-dashed border-purple-200 rounded-lg p-2"><img src={previewImage} alt="Pratinjau" className="w-full h-full object-cover rounded-md" /><Button variant="destructive" size="icon" className="absolute -top-3 -right-3 h-7 w-7 rounded-full" onClick={() => { setPreviewImage(null); setSelectedFile(null); }}><X className="h-4 w-4" /></Button></div>)}
                   {(muaProfile?.portfolio_images || []).length === 0 && !previewImage && (<div className="col-span-full text-center py-12 text-gray-500 border-2 border-dashed border-gray-200 rounded-lg"><Upload className="h-12 w-12 mx-auto mb-4 opacity-50" /><p>Belum ada foto portfolio</p></div>)}
                 </div>
@@ -435,7 +604,7 @@ const MUAProfile = () => {
                         <Badge variant={service.is_active ? "default" : "secondary"}>{service.is_active ? "Aktif" : "Nonaktif"}</Badge>
                       </div>
                     </div>
-                    <Button variant="ghost" size="sm">Edit</Button>
+                    <Button variant="outline" size="sm" onClick={() => handleOpenEditModal(service)}><Edit className="h-4 w-4 mr-2"/>Edit</Button>
                   </div>))}
                   {services.length === 0 && (<div className="text-center py-12 text-gray-500"><Star className="h-12 w-12 mx-auto mb-4 opacity-50" /><p>Belum ada layanan ditambahkan</p></div>)}
                 </div>
@@ -503,6 +672,39 @@ const MUAProfile = () => {
             </Card>
           </TabsContent>
         </Tabs>
+
+        <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+            <DialogContent className="max-w-3xl">
+                <DialogHeader>
+                    <DialogTitle>Edit Jasa Makeup</DialogTitle>
+                </DialogHeader>
+                {editingService && (
+                    <form onSubmit={handleUpdateService} className="space-y-4">
+                        <div className="flex flex-col md:flex-row gap-6">
+                            <div className="flex-1 space-y-4">
+                                <div className="space-y-1"><Label htmlFor="edit-name">Nama Jasa</Label><Input id="edit-name" name="name" value={editingService.name} onChange={handleEditServiceChange} required /></div>
+                                <div className="space-y-1"><Label htmlFor="edit-description">Deskripsi</Label><Textarea id="edit-description" name="description" value={editingService.description || ''} onChange={handleEditServiceChange} required /></div>
+                                <div className="flex gap-4">
+                                    <div className="space-y-1 w-1/2"><Label htmlFor="edit-price_min">Harga (Rp)</Label><Input id="edit-price_min" name="price_min" type="number" value={editingService.price_min} onChange={handleEditServiceChange} required /></div>
+                                    <div className="space-y-1 w-1/2"><Label htmlFor="edit-duration_minutes">Durasi (menit)</Label><Input id="edit-duration_minutes" name="duration_minutes" type="number" value={editingService.duration_minutes || 0} onChange={handleEditServiceChange} required /></div>
+                                </div>
+                            </div>
+                            <div className="flex-1">
+                                <Label>Foto Layanan</Label>
+                                <div className="mt-1 aspect-video border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center bg-white">
+                                    {editServicePreview ? (<img src={editServicePreview} alt="Pratinjau" className="h-full w-full object-cover rounded-md" />) : (<div className="text-center text-gray-500"><p>Tidak ada gambar</p></div>)}
+                                </div>
+                                <Input id="edit-service-image-upload" type="file" className="mt-2" accept="image/*" onChange={handleEditServiceFileSelect}/>
+                            </div>
+                        </div>
+                        <DialogFooter>
+                            <Button type="button" variant="ghost" onClick={() => setIsEditModalOpen(false)}>Batal</Button>
+                            <Button type="submit" disabled={isAddingService} className="bg-purple-600 hover:bg-purple-700">{isAddingService ? "Menyimpan..." : "Simpan Perubahan"}</Button>
+                        </DialogFooter>
+                    </form>
+                )}
+            </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

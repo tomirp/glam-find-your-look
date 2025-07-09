@@ -10,18 +10,9 @@ const NearbyMUASection = () => {
   useEffect(() => {
     const fetchNearbyMUAs = async () => {
       setLoading(true);
-      // Mengambil 4 MUA secara acak sebagai simulasi "terdekat"
       const { data, error } = await supabase
         .from("mua_profiles")
-        .select(`
-          id,
-          business_name,
-          rating,
-          total_reviews,
-          location_city,
-          specializations,
-          price_range
-        `)
+        .select(`id, business_name, rating, total_reviews, location_city, specializations, price_range, cover_image_url`)
         .limit(4);
 
       if (error) {
@@ -31,7 +22,6 @@ const NearbyMUASection = () => {
       }
       setLoading(false);
     };
-
     fetchNearbyMUAs();
   }, []);
 
@@ -41,15 +31,12 @@ const NearbyMUASection = () => {
         <h2 className="text-3xl md:text-4xl font-bold text-center text-foreground mb-12 font-heading">
           MUA yang Dekat Dengan Anda
         </h2>
-        
         {loading ? (
           <p className="text-center">Memuat MUA terdekat...</p>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {nearbyMUAs.map((mua) => (
-              <Link key={mua.id} to={`/mua/${mua.id}`}>
-                <MUACard {...mua} />
-              </Link>
+              <Link key={mua.id} to={`/mua/${mua.id}`}><MUACard {...mua} /></Link>
             ))}
           </div>
         )}
@@ -57,5 +44,4 @@ const NearbyMUASection = () => {
     </section>
   );
 };
-
 export default NearbyMUASection;

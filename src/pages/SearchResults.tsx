@@ -24,6 +24,7 @@ const SearchResults = () => {
       
       let query = supabase
         .from('mua_profiles')
+        // **PERBAIKAN DI SINI: Menambahkan cover_image_url**
         .select(`
           id,
           business_name,
@@ -31,21 +32,29 @@ const SearchResults = () => {
           total_reviews,
           location_city,
           specializations,
-          price_range
+          price_range,
+          cover_image_url
         `);
 
+      // Filter berdasarkan query pencarian
       if (searchQuery) {
         query = query.ilike('business_name', `%${searchQuery}%`);
       }
       
+      // Filter berdasarkan lokasi
       if (selectedLocation) {
         query = query.eq('location_city', selectedLocation);
       }
       
+      // Urutkan hasil
       if (sortBy === 'rating') {
         query = query.order('rating', { ascending: false, nullsFirst: false });
-      } else {
-        query = query.order('business_name', { ascending: sortBy === 'price-low' });
+      } else if (sortBy === 'price-low') {
+        // Pengurutan berdasarkan harga memerlukan penanganan lebih lanjut
+        // karena price_range adalah string. Untuk saat ini, kita urutkan berdasarkan nama.
+        query = query.order('business_name', { ascending: true });
+      } else if (sortBy === 'price-high') {
+        query = query.order('business_name', { ascending: false });
       }
 
       const { data, error } = await query;

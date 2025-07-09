@@ -13,15 +13,14 @@ import {
 import { ArrowLeft, Star, MapPin, Heart, Calendar } from "lucide-react";
 import BookingModal from "@/components/BookingModal";
 import { supabase } from "@/integrations/supabase/client";
-// **PERBAIKAN DI SINI: Impor interface yang sudah diganti namanya**
-import { MUAProfileData } from "@/pages/MUAProfile"; 
+import { MUAProfileData } from "@/pages/MUAProfile"; // Menggunakan nama interface yang sudah diperbaiki
 
 interface Service {
     id: string;
     name: string;
     description: string | null;
     price_min: number;
-    rating?: number;
+    rating?: number; // Anggap rating per layanan ada
     image_url: string | null;
 }
 
@@ -30,7 +29,6 @@ const MUADetail = () => {
   const navigate = useNavigate();
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
 
-  // **PERBAIKAN DI SINI: Gunakan nama interface yang baru**
   const [muaData, setMuaData] = useState<MUAProfileData | null>(null);
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,6 +38,7 @@ const MUADetail = () => {
       if (!id) return;
       setLoading(true);
 
+      // 1. Ambil detail profil MUA dari database
       const { data: muaProfile, error: muaError } = await supabase
         .from('mua_profiles')
         .select('*')
@@ -48,11 +47,12 @@ const MUADetail = () => {
 
       if (muaError || !muaProfile) {
         console.error("Error fetching MUA details:", muaError);
-        navigate('/404');
+        navigate('/404'); // Arahkan ke halaman not found jika MUA tidak ada
         return;
       }
       setMuaData(muaProfile);
 
+      // 2. Ambil layanan (services) yang terkait dengan MUA tersebut
       const { data: servicesData, error: servicesError } = await supabase
         .from('services')
         .select('*')
@@ -84,7 +84,7 @@ const MUADetail = () => {
     name: muaData.business_name || '',
     location: muaData.location_city || '',
     styles: services.map(s => ({
-        id: s.id,
+        id: s.id, // ID sudah string, jadi tidak perlu parseInt
         name: s.name,
         price: `Rp ${s.price_min.toLocaleString('id-ID')}`
     }))
@@ -146,8 +146,8 @@ const MUADetail = () => {
               <div className="flex items-center space-x-4 mb-4">
                 <div className="flex items-center space-x-1">
                   <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
-                  <span className="font-medium">{muaData.rating?.toFixed(1)}</span>
-                  <span className="text-muted-foreground">({muaData.total_reviews} ulasan)</span>
+                  <span className="font-medium">{muaData.rating?.toFixed(1) || 'Baru'}</span>
+                  <span className="text-muted-foreground">({muaData.total_reviews || 0} ulasan)</span>
                 </div>
                 
                 <div className="flex items-center space-x-1">
@@ -163,9 +163,9 @@ const MUADetail = () => {
               <div className="mb-6">
                 <h3 className="text-lg font-semibold mb-3">Spesialisasi</h3>
                 <div className="flex flex-wrap gap-2">
-                  {muaData.specializations?.map((brand, index) => (
+                  {muaData.specializations?.map((specialty, index) => (
                     <Badge key={index} variant="secondary">
-                      {brand}
+                      {specialty}
                     </Badge>
                   ))}
                 </div>

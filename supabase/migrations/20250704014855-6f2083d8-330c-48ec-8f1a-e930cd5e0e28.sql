@@ -212,3 +212,53 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER update_mua_rating_trigger
   AFTER INSERT ON public.reviews
   FOR EACH ROW EXECUTE FUNCTION public.update_mua_rating();
+
+  -- Create enum for user types
+CREATE TYPE public.user_type AS ENUM ('customer', 'mua');
+
+-- Create enum for booking status
+CREATE TYPE public.booking_status AS ENUM ('pending', 'accepted', 'rejected', 'completed', 'cancelled');
+
+-- Create enum for payment status
+CREATE TYPE public.payment_status AS ENUM ('pending', 'paid', 'refunded', 'failed');
+
+-- Create profiles table
+CREATE TABLE public.profiles (
+  id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID NOT NULL UNIQUE REFERENCES auth.users(id) ON DELETE CASCADE,
+  user_type user_type NOT NULL,
+  full_name TEXT NOT NULL,
+  phone TEXT,
+  address TEXT,
+  avatar_url TEXT,
+  bio TEXT,
+  is_verified BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+);
+
+-- Create MUA profiles table (extends profiles for MUA-specific data)
+CREATE TABLE public.mua_profiles (
+  id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  profile_id UUID NOT NULL UNIQUE REFERENCES public.profiles(id) ON DELETE CASCADE,
+  business_name TEXT,
+  experience_years INTEGER,
+  price_range TEXT,
+  location_city TEXT NOT NULL,
+  location_address TEXT,
+  specializations TEXT[],
+  portfolio_images TEXT[],
+  instagram_url TEXT,
+  whatsapp_number TEXT,
+  bank_account_number TEXT,
+  bank_name TEXT,
+  bank_account_name TEXT,
+  rating DECIMAL(3,2) DEFAULT 0.00,
+  total_reviews INTEGER DEFAULT 0,
+  total_bookings INTEGER DEFAULT 0,
+  is_available BOOLEAN DEFAULT TRUE,
+  -- **PENAMBAHAN BARIS DI SINI**
+  cover_image_url TEXT, -- Untuk menyimpan URL foto utama
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+);
