@@ -5,6 +5,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter, // Impor DialogFooter
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -44,7 +45,6 @@ const BookingModal = ({ isOpen, onClose, muaData }: BookingModalProps) => {
       muaName: muaData.name,
       muaLocation: muaData.location,
       service: selectedStyle.name,
-      // **PERBAIKAN DI SINI: Menambahkan serviceId**
       serviceId: selectedStyle.id,
       price: selectedStyle.price,
       date: selectedDate.toISOString(),
@@ -76,14 +76,16 @@ const BookingModal = ({ isOpen, onClose, muaData }: BookingModalProps) => {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md bg-background">
+      {/* **PERUBAIKAN 1: Membuat konten modal bisa di-scroll** */}
+      <DialogContent className="max-w-md bg-background flex flex-col max-h-[90vh]">
         <DialogHeader>
           <DialogTitle className="text-center font-heading">
             Pilih Tanggal & Waktu
           </DialogTitle>
         </DialogHeader>
         
-        <div className="space-y-6">
+        {/* Konten yang bisa di-scroll */}
+        <div className="flex-grow overflow-y-auto pr-4 -mr-4 space-y-6">
           <div>
             <Label className="text-sm font-medium mb-2 block">Pilih Layanan</Label>
             <select
@@ -153,8 +155,10 @@ const BookingModal = ({ isOpen, onClose, muaData }: BookingModalProps) => {
               </p>
             </div>
           )}
-
-          <div className="flex space-x-3">
+        </div>
+        
+        {/* **PERBAIKAN 2: Memindahkan tombol ke DialogFooter agar selalu terlihat** */}
+        <DialogFooter className="pt-4 border-t">
             <Button 
               variant="outline" 
               onClick={onClose}
@@ -169,8 +173,7 @@ const BookingModal = ({ isOpen, onClose, muaData }: BookingModalProps) => {
             >
               Konfirmasi
             </Button>
-          </div>
-        </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

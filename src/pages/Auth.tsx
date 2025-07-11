@@ -7,13 +7,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useAuth } from "@/contexts/AuthContext";
-import { useToast } from "@/hooks/use-toast";
+// **PERBAIKAN 1: Ganti useToast dengan 'sonner'**
+import { toast } from "sonner"; 
 import { Eye, EyeOff, ArrowLeft } from "lucide-react";
 
 const Auth = () => {
   const navigate = useNavigate();
-  const { signIn, signUp, user, role, loading: authLoading } = useAuth();
-  const { toast } = useToast();
+  const { signIn, signUp, user, role, muaProfileExists, loading: authLoading, loginRedirect, clearLoginRedirect } = useAuth();
   
   const [activeTab, setActiveTab] = useState("login");
   const [loading, setLoading] = useState(false);
@@ -26,25 +26,46 @@ const Auth = () => {
   });
 
   useEffect(() => {
-    if (!authLoading && user && role) {
-      if (role === 'mua') {
-        navigate('/mua/profile');
-      } else if (role === 'customer') {
-        navigate('/customer/profile');
+    if (authLoading) return;
+
+    if (user && role) {
+      if (loginRedirect) {
+        navigate(loginRedirect.pathname, { state: loginRedirect.state, replace: true });
+        clearLoginRedirect();
+      } else {
+        if (role === 'mua') {
+          navigate(muaProfileExists ? '/mua/profile' : '/mua/onboarding');
+        } else if (role === 'customer') {
+          navigate('/customer/profile');
+        }
       }
     }
-  }, [user, role, authLoading, navigate]);
-
+  }, [user, role, authLoading, muaProfileExists, navigate, loginRedirect, clearLoginRedirect]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     
     const { error } = await signIn(loginData.email, loginData.password);
+    
     if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      if (error.message.includes("Email not confirmed")) {
+        // **PERBAIKAN 2: Menggunakan toast.error dari 'sonner'**
+        toast.error("Verifikasi Diperlukan", {
+            description: "Silakan periksa dan klik link verifikasi di email Anda sebelum masuk."
+        });
+      } else {
+        toast.error("Gagal Masuk", {
+            description: "Kombinasi email dan password salah. Silakan coba lagi."
+        });
+      }
+      setLoading(false);
+    } else {
+      // **PERBAIKAN 3: Menggunakan toast.success dari 'sonner' yang sudah ada ikonnya**
+      toast.success("Anda Berhasil Masuk", {
+        description: "Anda akan diarahkan sebentar lagi...",
+      });
     }
-    setLoading(false);
   };
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -52,11 +73,11 @@ const Auth = () => {
     setLoading(true);
 
     if (registerData.password !== registerData.confirmPassword) {
-      toast({ title: "Error", description: "Password tidak cocok", variant: "destructive" });
+      toast.error("Error", { description: "Password tidak cocok" });
       setLoading(false); return;
     }
     if (registerData.password.length < 6) {
-      toast({ title: "Error", description: "Password minimal 6 karakter", variant: "destructive" });
+      toast.error("Error", { description: "Password minimal 6 karakter" });
       setLoading(false); return;
     }
 
@@ -65,16 +86,23 @@ const Auth = () => {
     });
 
     if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast.error("Error", { description: error.message });
     } else {
-      toast({
-        title: "Pendaftaran Berhasil!",
+      toast.success("Pendaftaran Berhasil!", {
         description: "Silakan periksa email untuk verifikasi dan masuk ke akun Anda.",
       });
       setActiveTab("login"); 
     }
     setLoading(false);
   };
+  
+  if (authLoading && !user) {
+      return (
+          <div className="min-h-screen flex items-center justify-center">
+              <div>Memuat...</div>
+          </div>
+      )
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20 flex items-center justify-center p-4">
@@ -88,8 +116,6 @@ const Auth = () => {
             <p className="text-muted-foreground">Platform terpercaya untuk layanan makeup artist</p>
         </div>
         
-        {/* BAGIAN AKUN TESTING SUDAH DIHAPUS DARI SINI */}
-
         <Card>
             <CardHeader className="text-center">
                 <CardTitle>Masuk ke Akun Anda</CardTitle>
@@ -161,8 +187,8 @@ const Auth = () => {
                                 <Label htmlFor="confirmPassword">Konfirmasi Password</Label>
                                 <Input id="confirmPassword" type="password" placeholder="Ulangi password" value={registerData.confirmPassword} onChange={(e) => setRegisterData({ ...registerData, confirmPassword: e.target.value })} required />
                             </div>
-                            <Button type="submit" className="w-full" disabled={loading || authLoading}>
-                                {loading || authLoading ? "Memproses..." : "Daftar"}
+                            <Button type="submit" className="w-full" disabled={loading}>
+                                {loading ? "Memproses..." : "Daftar"}
                             </Button>
                         </form>
                     </TabsContent>

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext"; // Import useAuth
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,7 +14,17 @@ import {
 import { ArrowLeft, Star, MapPin, Heart, Calendar } from "lucide-react";
 import BookingModal from "@/components/BookingModal";
 import { supabase } from "@/integrations/supabase/client";
-import { MUAProfileData } from "@/pages/MUAProfile"; // Menggunakan nama interface yang sudah diperbaiki
+import { MUAProfileData } from "@/pages/MUAProfile";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface Service {
     id: string;
@@ -27,6 +38,7 @@ interface Service {
 const MUADetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { role } = useAuth(); // Dapatkan peran pengguna
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
 
   const [muaData, setMuaData] = useState<MUAProfileData | null>(null);
@@ -38,7 +50,6 @@ const MUADetail = () => {
       if (!id) return;
       setLoading(true);
 
-      // 1. Ambil detail profil MUA dari database
       const { data: muaProfile, error: muaError } = await supabase
         .from('mua_profiles')
         .select('*')
@@ -47,12 +58,11 @@ const MUADetail = () => {
 
       if (muaError || !muaProfile) {
         console.error("Error fetching MUA details:", muaError);
-        navigate('/404'); // Arahkan ke halaman not found jika MUA tidak ada
+        navigate('/404');
         return;
       }
       setMuaData(muaProfile);
 
-      // 2. Ambil layanan (services) yang terkait dengan MUA tersebut
       const { data: servicesData, error: servicesError } = await supabase
         .from('services')
         .select('*')
@@ -84,11 +94,54 @@ const MUADetail = () => {
     name: muaData.business_name || '',
     location: muaData.location_city || '',
     styles: services.map(s => ({
-        id: s.id, // ID sudah string, jadi tidak perlu parseInt
+        id: s.id,
         name: s.name,
         price: `Rp ${s.price_min.toLocaleString('id-ID')}`
     }))
   };
+  
+  const renderBookingButton = () => {
+    // Jika pengguna adalah MUA, tampilkan tombol dengan pop-up peringatan
+    if (role === 'mua') {
+      return (
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button
+              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
+              size="lg"
+            >
+              <Calendar className="w-4 h-4 mr-2" />
+              Pesan Sekarang
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Tidak Bisa Memesan</AlertDialogTitle>
+              <AlertDialogDescription>
+                Anda tidak dapat memesan layanan Anda sendiri. Silakan masuk sebagai pelanggan untuk melanjutkan.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogAction>Mengerti</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      );
+    }
+
+    // Jika bukan MUA (pelanggan atau belum login), tampilkan tombol yang membuka modal booking
+    return (
+      <Button 
+        onClick={() => setIsBookingModalOpen(true)}
+        className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
+        size="lg"
+      >
+        <Calendar className="w-4 h-4 mr-2" />
+        Pesan Sekarang
+      </Button>
+    );
+  };
+
 
   return (
     <div className="min-h-screen bg-background">
@@ -171,14 +224,8 @@ const MUADetail = () => {
                 </div>
               </div>
 
-              <Button 
-                onClick={() => setIsBookingModalOpen(true)}
-                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
-                size="lg"
-              >
-                <Calendar className="w-4 h-4 mr-2" />
-                Pesan Sekarang
-              </Button>
+              {renderBookingButton()}
+
             </div>
           </div>
         </div>
