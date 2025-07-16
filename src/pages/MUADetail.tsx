@@ -1,20 +1,16 @@
+// src/pages/MUADetail.tsx
+
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext"; // Import useAuth
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { 
-  Carousel, 
-  CarouselContent, 
-  CarouselItem, 
-  CarouselNext, 
-  CarouselPrevious 
-} from "@/components/ui/carousel";
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 import { ArrowLeft, Star, MapPin, Heart, Calendar } from "lucide-react";
 import BookingModal from "@/components/BookingModal";
 import { supabase } from "@/integrations/supabase/client";
-import { MUAProfileData } from "@/pages/MUAProfile";
+import type { MUAProfile } from "@/components/MUAProfile/types"; 
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,22 +22,23 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
+
 interface Service {
     id: string;
     name: string;
     description: string | null;
     price_min: number;
-    rating?: number; // Anggap rating per layanan ada
+    rating?: number;
     image_url: string | null;
 }
 
 const MUADetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { role } = useAuth(); // Dapatkan peran pengguna
+  const { role } = useAuth();
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
 
-  const [muaData, setMuaData] = useState<MUAProfileData | null>(null);
+  const [muaData, setMuaData] = useState<MUAProfile | null>(null);
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -81,7 +78,7 @@ const MUADetail = () => {
     fetchMUADetails();
   }, [id, navigate]);
 
-  if (loading) {
+ if (loading) {
     return <div className="min-h-screen flex items-center justify-center">Memuat detail MUA...</div>;
   }
 
@@ -101,7 +98,6 @@ const MUADetail = () => {
   };
   
   const renderBookingButton = () => {
-    // Jika pengguna adalah MUA, tampilkan tombol dengan pop-up peringatan
     if (role === 'mua') {
       return (
         <AlertDialog>
@@ -129,7 +125,6 @@ const MUADetail = () => {
       );
     }
 
-    // Jika bukan MUA (pelanggan atau belum login), tampilkan tombol yang membuka modal booking
     return (
       <Button 
         onClick={() => setIsBookingModalOpen(true)}
@@ -152,7 +147,7 @@ const MUADetail = () => {
             onClick={() => navigate(-1)}
             className="flex items-center space-x-2"
           >
-            <ArrowLeft className="w-4 h-4" />
+            <ArrowLeft className="h-4 w-4" />
             <span>Kembali</span>
           </Button>
           

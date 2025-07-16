@@ -1,3 +1,5 @@
+// src/components/MUAProfile/DashboardTab.tsx
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CalendarIcon, DollarSign, Star, Clock } from "lucide-react";
@@ -18,47 +20,40 @@ export const DashboardTab = ({ bookings, services }: DashboardTabProps) => {
 
   return (
     <div className="space-y-6">
-      {/* Stats Cards */}
-      <div className="grid gap-6 md:grid-cols-3">
-        <Card className="border-0 shadow-lg bg-gradient-to-br from-blue-50 to-blue-100">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Pesanan Bulan Ini</p>
-                <p className="text-3xl font-bold text-blue-600">{monthlyBookings.length}</p>
-              </div>
-              <CalendarIcon className="h-12 w-12 text-blue-500/50" />
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Card className="border-0 shadow-lg">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Pesanan Bulan Ini</p>
+              <p className="text-2xl font-bold text-blue-600">{monthlyBookings.length}</p>
             </div>
+            <CalendarIcon className="h-10 w-10 text-blue-500/50" />
           </CardContent>
         </Card>
 
-        <Card className="border-0 shadow-lg bg-gradient-to-br from-green-50 to-green-100">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Pendapatan Bulan Ini</p>
-                <p className="text-3xl font-bold text-green-600">
-                  {formatCurrency(monthlyRevenue)}
-                </p>
-              </div>
-              <DollarSign className="h-12 w-12 text-green-500/50" />
+         <Card className="border-0 shadow-lg">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Pendapatan Bulan Ini</p>
+              <p className="text-2xl font-bold text-green-600">
+                {formatCurrency(monthlyRevenue)}
+              </p>
             </div>
+            <DollarSign className="h-10 w-10 text-green-500/50" />
           </CardContent>
         </Card>
 
-        <Card className="border-0 shadow-lg bg-gradient-to-br from-purple-50 to-purple-100">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Layanan Aktif</p>
-                <p className="text-3xl font-bold text-purple-600">{services.filter(s => s.is_active).length}</p>
-              </div>
-              <Star className="h-12 w-12 text-purple-500/50" />
+        <Card className="border-0 shadow-lg">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Layanan Aktif</p>
+              <p className="text-2xl font-bold text-purple-600">{services.filter(s => s.is_active).length}</p>
             </div>
+            <Star className="h-10 w-10 text-purple-500/50" />
           </CardContent>
         </Card>
       </div>
-
+      
       {/* Recent Bookings */}
       <Card className="border-0 shadow-lg">
         <CardHeader>
@@ -70,21 +65,24 @@ export const DashboardTab = ({ bookings, services }: DashboardTabProps) => {
         <CardContent>
           <div className="space-y-4">
             {bookings.slice(0, 5).map(booking => (
-              <div key={booking.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <h4 className="font-medium">{booking.profiles?.full_name}</h4>
-                    <Badge className={`${getStatusColor(booking.status)} border-0`}>
-                      {booking.status}
-                    </Badge>
-                  </div>
-                  <p className="text-sm text-gray-600">{booking.services?.name}</p>
-                  <p className="text-xs text-gray-500">
-                    {new Date(booking.booking_date).toLocaleDateString('id-ID')} • {booking.booking_time}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="font-semibold text-purple-600">{formatCurrency(booking.total_price)}</p>
+              <div key={booking.id} className="p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                <div className="flex justify-between items-start gap-3">
+                    <div className="flex-grow min-w-0">
+                        <h4 className="font-medium truncate">{booking.profiles?.full_name}</h4>
+                        <p className="text-sm text-gray-600 truncate">{booking.services?.name}</p>
+                        <div className="flex flex-wrap items-center gap-2 mt-2">
+                           <Badge className={`${getStatusColor(booking.status)} border-0 text-xs font-medium`}>{booking.status}</Badge>
+                           <Badge variant={booking.payments?.payment_status === 'paid' ? 'default' : 'destructive'} className="text-xs font-medium">
+                              {booking.payments?.payment_status === 'paid' ? 'Lunas' : 'Belum Bayar'}
+                           </Badge>
+                        </div>
+                    </div>
+                    <div className="flex-shrink-0 text-right">
+                        <p className="font-semibold text-purple-600 whitespace-nowrap">{formatCurrency(booking.total_price)}</p>
+                        <p className="text-xs text-gray-500 mt-1">
+                            {new Date(booking.booking_date).toLocaleDateString('id-ID', {day: '2-digit', month: 'short'})}
+                        </p>
+                    </div>
                 </div>
               </div>
             ))}

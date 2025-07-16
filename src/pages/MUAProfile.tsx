@@ -1,3 +1,5 @@
+// src/pages/MUAProfile.tsx
+
 import { useState, useEffect, ChangeEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -27,712 +29,229 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { DashboardTab } from "@/components/MUAProfile/DashboardTab";
+import { ServicesPortfolioTab } from "@/components/MUAProfile/ServicesPortfolioTab";
+import { EditProfileTab } from "@/components/MUAProfile/EditProfileTab";
+import { ScheduleTab } from "@/components/MUAProfile/ScheduleTab";
+import { ProfileHeader } from "@/components/MUAProfile/ProfileHeader";
 
+// PERBAIKAN: Menggunakan `import type` untuk menghindari konflik nama
+import type { MUAProfile as MUAProfileType, UserProfile, Booking, Service, EditForm } from "@/components/MUAProfile/types";
 
-// --- INTERFACE ---
-export interface MUAProfileData {
-  id: string;
-  business_name: string | null;
-  location_city: string;
-  location_address: string | null;
-  rating: number | null;
-  total_reviews: number | null;
-  total_bookings: number | null;
-  is_available: boolean | null;
-  portfolio_images: string[] | null;
-  profile_id: string;
-  specializations: string[] | null;
-  cover_image_url: string | null;
-}
-
-interface UserProfile {
-  id: string;
-  full_name: string;
-  phone: string | null;
-  avatar_url: string | null;
-  bio: string | null;
-}
-
-interface Booking {
-  id: string;
-  booking_date: string;
-  booking_time: string;
-  status: string;
-  total_price: number;
-  customer_notes: string | null;
-  profiles: { full_name: string; };
-  services: { name: string; };
-  payments: { payment_status: string; } | null;
-}
-
-interface Service {
-  id: string;
-  name: string;
-  description: string | null;
-  price_min: number;
-  price_max: number | null;
-  duration_minutes: number | null;
-  is_active: boolean | null;
-  image_url: string | null;
-}
-
-const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(amount);
-};
-
-const getStatusColor = (status: string) => {
-  switch (status) {
-    case 'completed': return 'bg-green-100 text-green-800';
-    case 'accepted': return 'bg-blue-100 text-blue-800';
-    case 'pending': return 'bg-yellow-100 text-yellow-800';
-    case 'rejected': return 'bg-red-100 text-red-800';
-    case 'cancelled': return 'bg-gray-100 text-gray-800';
-    default: return 'bg-gray-100 text-gray-800';
-  }
-};
 
 const MUAProfile = () => {
-  const { user, loading: authLoading, signOut } = useAuth();
-  const navigate = useNavigate();
-  const { toast } = useToast();
-
-  const [muaProfile, setMuaProfile] = useState<MUAProfileData | null>(null);
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [bookings, setBookings] = useState<Booking[]>([]);
-  const [services, setServices] = useState<Service[]>([]);
-  const [unavailableDates, setUnavailableDates] = useState<Date[]>([]);
-  const [pageLoading, setPageLoading] = useState(true);
+    const { user, loading: authLoading, signOut } = useAuth();
+    const navigate = useNavigate();
+    const { toast } = useToast();
   
-  const [editForm, setEditForm] = useState({ business_name: '', full_name: '', phone: '', location_city: '', location_address: '', bio: '' });
-  const [activeTab, setActiveTab] = useState("dashboard");
+    // PERBAIKAN: Menggunakan nama interface yang telah diganti menjadi MUAProfileType
+    const [muaProfile, setMuaProfile] = useState<MUAProfileType | null>(null);
+    const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+    const [bookings, setBookings] = useState<Booking[]>([]);
+    const [services, setServices] = useState<Service[]>([]);
+    const [unavailableDates, setUnavailableDates] = useState<Date[]>([]);
+    const [pageLoading, setPageLoading] = useState(true);
+    
+    const [editForm, setEditForm] = useState<EditForm>({ business_name: '', full_name: '', phone: '', location_city: '', location_address: '', bio: '' });
+    const [activeTab, setActiveTab] = useState("dashboard");
   
-  const [previewImage, setPreviewImage] = useState<string | null>(null);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
-
-  const [newService, setNewService] = useState({ name: '', description: '', price_min: 0, duration_minutes: 0 });
-  const [newServiceFile, setNewServiceFile] = useState<File | null>(null);
-  const [newServicePreview, setNewServicePreview] = useState<string | null>(null);
-  const [isAddingService, setIsAddingService] = useState(false);
+    const fetchAllData = async () => {
+      if (!user) return;
+      setPageLoading(true);
+      try {
+        const { data: profile, error: profileError } = await supabase.from('profiles').select('id, full_name, phone, avatar_url, bio').eq('user_id', user.id).single();
+        if (profileError) throw profileError;
+        setUserProfile(profile);
   
-  const [editingService, setEditingService] = useState<Service | null>(null);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [editServiceFile, setEditServiceFile] = useState<File | null>(null);
-  const [editServicePreview, setEditServicePreview] = useState<string | null>(null);
-
-  const fetchAllData = async () => {
-    if (!user) return;
-    setPageLoading(true);
-    try {
-      const { data: profile, error: profileError } = await supabase.from('profiles').select('id, full_name, phone, avatar_url, bio').eq('user_id', user.id).single();
-      if (profileError) throw profileError;
-      setUserProfile(profile);
-
-      const { data: muaData, error: muaError } = await supabase.from('mua_profiles').select('*').eq('profile_id', profile.id).single();
-      if (muaError && muaError.code !== 'PGRST116') throw muaError;
-      setMuaProfile(muaData);
-
-      setEditForm({
-        business_name: muaData?.business_name || '',
-        full_name: profile.full_name || '',
-        phone: profile.phone || '',
-        location_city: muaData?.location_city || '',
-        location_address: muaData?.location_address || '',
-        bio: profile.bio || '',
-      });
-
-      if (muaData) {
-        const { data: bookingsData, error: bookingError } = await supabase
-          .from('bookings')
-          .select(`id, booking_date, booking_time, status, total_price, customer_notes, profiles!bookings_customer_id_fkey(full_name), services(name), payments!left(payment_status)`)
-          .eq('mua_profile_id', muaData.id)
-          .order('booking_date', { ascending: false });
-        if(bookingError) throw bookingError;
-        const typedBookings = bookingsData.map(b => ({...b, payments: Array.isArray(b.payments) ? b.payments[0] : b.payments})) as Booking[];
-        setBookings(typedBookings);
-
-        const { data: servicesData, error: servicesError } = await supabase.from('services').select('*').eq('mua_profile_id', muaData.id).order('name');
-        if (servicesError) throw servicesError;
-        setServices(servicesData || []);
-      }
-    } catch (error: any) {
-      console.error('Error fetching data:', error);
-      toast({ title: "Error", description: "Gagal memuat data profil.", variant: "destructive" });
-    } finally {
-      setPageLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (user) {
-      fetchAllData();
-    } else if (!authLoading) {
-      navigate('/auth', { replace: true });
-    }
-  }, [user]);
-
-  const handleSignOut = async () => {
-    await signOut();
-    navigate('/');
-  };
-
-  const handleFileSelect = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreviewImage(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
+        const { data: muaData, error: muaError } = await supabase.from('mua_profiles').select('*').eq('profile_id', profile.id).single();
+        if (muaError && muaError.code !== 'PGRST116') throw muaError;
+        setMuaProfile(muaData);
   
-  const handleConfirmUpload = async () => {
-    if (!selectedFile || !user || !muaProfile) return;
-    setUploading(true);
-    toast({ description: "Mengunggah foto..." });
-    const fileExt = selectedFile.name.split('.').pop();
-    const fileName = `${Date.now()}.${fileExt}`;
-    const filePath = `${user.id}/${fileName}`;
-    const { error: uploadError } = await supabase.storage.from('portfolio').upload(filePath, selectedFile);
-    if (uploadError) {
-      toast({ title: "Gagal Unggah", description: uploadError.message, variant: "destructive" });
-      setUploading(false);
-      return;
-    }
-    const { data } = supabase.storage.from('portfolio').getPublicUrl(filePath);
-    const updatedImages = [...(muaProfile.portfolio_images || []), data.publicUrl];
-    const { error: dbError } = await supabase.from('mua_profiles').update({ portfolio_images: updatedImages }).eq('id', muaProfile.id);
-    if (dbError) {
-      toast({ title: "Gagal Simpan URL", description: dbError.message, variant: "destructive" });
-    } else {
-      toast({ title: "Berhasil", description: "Foto portofolio telah ditambahkan." });
-      await fetchAllData();
-    }
-    setPreviewImage(null);
-    setSelectedFile(null);
-    setUploading(false);
-  };
-  
-  const handleDeletePortfolioImage = async (imageUrl: string) => {
-    if (!user || !muaProfile) return;
-    toast({ description: "Menghapus foto..." });
-    try {
-      const url = new URL(imageUrl);
-      const filePath = url.pathname.split(`/portfolio/`)[1];
-      const { error: storageError } = await supabase.storage.from('portfolio').remove([filePath]);
-      if (storageError) throw storageError;
-      const updatedImages = muaProfile.portfolio_images?.filter(img => img !== imageUrl) || [];
-      const { error: dbError } = await supabase.from('mua_profiles').update({ portfolio_images: updatedImages }).eq('id', muaProfile.id);
-      if (dbError) throw dbError;
-      toast({ title: "Berhasil", description: "Foto telah dihapus." });
-      await fetchAllData();
-    } catch (error: any) {
-      toast({ title: "Gagal Menghapus", description: error.message, variant: "destructive" });
-    }
-  };
-
-  const handleSetCoverImage = async (imageUrl: string) => {
-    if (!muaProfile) return;
-    toast({ description: "Menyimpan foto utama..." });
-    try {
-        const { error } = await supabase
-            .from('mua_profiles')
-            .update({ cover_image_url: imageUrl })
-            .eq('id', muaProfile.id);
-
-        if (error) throw error;
-        toast({ title: "Berhasil!", description: "Foto utama telah diperbarui." });
-        await fetchAllData();
-    } catch (error: any) {
-        toast({ title: "Gagal", description: error.message, variant: "destructive" });
-    }
-  };
-
-  const handleAvatarUpload = async (event: ChangeEvent<HTMLInputElement>) => {
-    if (!event.target.files || event.target.files.length === 0 || !user) {
-      return;
-    }
-    const file = event.target.files[0];
-    const fileExt = file.name.split('.').pop();
-    const filePath = `${user.id}/avatar.${fileExt}`;
-
-    toast({ description: "Mengunggah foto profil..." });
-    try {
-      const { error: uploadError } = await supabase.storage.from('avatars').upload(filePath, file, { upsert: true });
-      if (uploadError) throw uploadError;
-
-      const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(filePath);
-      const publicUrl = `${urlData.publicUrl}?t=${new Date().getTime()}`;
-
-      const { error: dbError } = await supabase
-        .from('profiles')
-        .update({ avatar_url: publicUrl })
-        .eq('user_id', user.id);
-      
-      if (dbError) throw dbError;
-
-      toast({ title: "Berhasil!", description: "Foto profil telah diperbarui." });
-      await fetchAllData();
-
-    } catch (error: any) {
-      toast({ title: "Gagal", description: error.message, variant: "destructive" });
-    }
-  };
-
-  const handleNewServiceChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setNewService(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleNewServiceFileSelect = (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setNewServiceFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => setNewServicePreview(reader.result as string);
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleAddNewService = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newServiceFile || !muaProfile || !user) {
-        toast({ title: "Data Tidak Lengkap", description: "Mohon isi semua field dan pilih gambar untuk layanan.", variant: "destructive" });
-        return;
-    }
-    setIsAddingService(true);
-    toast({ description: "Menambahkan layanan baru..." });
-    try {
-        const fileExt = newServiceFile.name.split('.').pop();
-        const fileName = `${Date.now()}.${fileExt}`;
-        const filePath = `${user.id}/${fileName}`;
-        const { error: uploadError } = await supabase.storage.from('services').upload(filePath, newServiceFile);
-        if (uploadError) throw uploadError;
-        const { data: urlData } = supabase.storage.from('services').getPublicUrl(filePath);
-        const { error: insertError } = await supabase.from('services').insert({
-            mua_profile_id: muaProfile.id,
-            name: newService.name,
-            description: newService.description,
-            price_min: newService.price_min,
-            duration_minutes: newService.duration_minutes,
-            image_url: urlData.publicUrl,
-            is_active: true
+        setEditForm({
+          business_name: muaData?.business_name || '',
+          full_name: profile.full_name || '',
+          phone: profile.phone || '',
+          location_city: muaData?.location_city || '',
+          location_address: muaData?.location_address || '',
+          bio: profile.bio || '',
         });
-        if (insertError) throw insertError;
-        toast({ title: "Berhasil!", description: `Layanan "${newService.name}" telah ditambahkan.` });
-        setNewService({ name: '', description: '', price_min: 0, duration_minutes: 0 });
-        setNewServiceFile(null);
-        setNewServicePreview(null);
-        await fetchAllData();
-    } catch (error: any) {
-        toast({ title: "Gagal Menambahkan Layanan", description: error.message, variant: "destructive" });
-    } finally {
-        setIsAddingService(false);
-    }
-  };
-
-  const handleOpenEditModal = (service: Service) => {
-    setEditingService(service);
-    setEditServicePreview(service.image_url);
-    setIsEditModalOpen(true);
-  };
   
-  const handleEditServiceChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    if (!editingService) return;
-    const { name, value } = e.target;
-    setEditingService({ ...editingService, [name]: value });
-  };
+        if (muaData) {
+          const { data: bookingsData, error: bookingError } = await supabase
+            .from('bookings')
+            .select(`id, booking_date, booking_time, status, total_price, customer_notes, profiles!bookings_customer_id_fkey(full_name), services(name), payments!left(payment_status)`)
+            .eq('mua_profile_id', muaData.id)
+            .order('booking_date', { ascending: false });
+          if(bookingError) throw bookingError;
+          const typedBookings = bookingsData.map(b => ({...b, payments: Array.isArray(b.payments) ? b.payments[0] : b.payments})) as Booking[];
+          setBookings(typedBookings);
   
-  const handleEditServiceFileSelect = (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setEditServiceFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => setEditServicePreview(reader.result as string);
-      reader.readAsDataURL(file);
-    }
-  };
-  
-  const handleUpdateService = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingService || !user) return;
-    setIsAddingService(true);
-    toast({ description: "Memperbarui layanan..." });
-    try {
-      let imageUrl = editingService.image_url;
-      if (editServiceFile) {
-        if (editingService.image_url) {
-          const oldUrl = new URL(editingService.image_url);
-          const oldFilePath = oldUrl.pathname.split(`/services/`)[1];
-          await supabase.storage.from('services').remove([oldFilePath]);
+          const { data: servicesData, error: servicesError } = await supabase.from('services').select('*').eq('mua_profile_id', muaData.id).order('name');
+          if (servicesError) throw servicesError;
+          setServices(servicesData || []);
         }
-        const fileExt = editServiceFile.name.split('.').pop();
-        const fileName = `${Date.now()}.${fileExt}`;
-        const filePath = `${user.id}/${fileName}`;
-        const { error: uploadError } = await supabase.storage.from('services').upload(filePath, editServiceFile);
-        if (uploadError) throw uploadError;
-        const { data: urlData } = supabase.storage.from('services').getPublicUrl(filePath);
-        imageUrl = urlData.publicUrl;
+      } catch (error: any) {
+        console.error('Error fetching data:', error);
+        toast({ title: "Error", description: "Gagal memuat data profil.", variant: "destructive" });
+      } finally {
+        setPageLoading(false);
       }
-      const { error: updateError } = await supabase
-        .from('services')
-        .update({
-          name: editingService.name,
-          description: editingService.description,
-          price_min: editingService.price_min,
-          duration_minutes: editingService.duration_minutes,
-          image_url: imageUrl
-        })
-        .eq('id', editingService.id);
-      if (updateError) throw updateError;
-      toast({ title: "Berhasil!", description: "Layanan telah diperbarui." });
-      setIsEditModalOpen(false);
-      await fetchAllData();
-    } catch (error: any) {
-      toast({ title: "Gagal Memperbarui", description: error.message, variant: "destructive" });
-    } finally {
-      setIsAddingService(false);
+    };
+  
+    useEffect(() => {
+      if (user) {
+        fetchAllData();
+      } else if (!authLoading) {
+        navigate('/auth', { replace: true });
+      }
+    }, [user, authLoading, navigate]);
+  
+    const handleSignOut = async () => {
+      await signOut();
+      navigate('/');
+    };
+  
+    const handleAvatarUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+      if (!event.target.files || event.target.files.length === 0 || !user || !userProfile) return;
+      
+      const file = event.target.files[0];
+      const fileExt = file.name.split('.').pop();
+      const filePath = `${user.id}/avatar.${fileExt}`;
+  
+      toast({ description: "Mengunggah foto profil..." });
+      try {
+        const { error: uploadError } = await supabase.storage.from('avatars').upload(filePath, file, { upsert: true });
+        if (uploadError) throw uploadError;
+  
+        const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(filePath);
+        const publicUrl = `${urlData.publicUrl}?t=${new Date().getTime()}`;
+  
+        const { error: dbError } = await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', userProfile.id);
+        if (dbError) throw dbError;
+  
+        toast({ title: "Berhasil!", description: "Foto profil telah diperbarui." });
+        await fetchAllData();
+  
+      } catch (error: any) {
+        toast({ title: "Gagal", description: error.message, variant: "destructive" });
+      }
+    };
+    
+    const handlePortfolioUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+      if (!event.target.files || event.target.files.length === 0 || !user || !muaProfile) return;
+      
+      const file = event.target.files[0];
+      const fileExt = file.name.split('.').pop();
+      const filePath = `${user.id}/${Date.now()}.${fileExt}`;
+  
+      toast({ description: "Mengunggah portofolio..." });
+      try {
+        const { error: uploadError } = await supabase.storage.from('portfolio').upload(filePath, file);
+        if (uploadError) throw uploadError;
+        
+        const { data } = supabase.storage.from('portfolio').getPublicUrl(filePath);
+        const updatedImages = [...(muaProfile.portfolio_images || []), data.publicUrl];
+        
+        const { error: dbError } = await supabase.from('mua_profiles').update({ portfolio_images: updatedImages }).eq('id', muaProfile.id);
+        if (dbError) throw dbError;
+        
+        toast({ title: "Berhasil!", description: "Portofolio telah ditambahkan." });
+        await fetchAllData();
+      } catch (error: any) {
+         toast({ title: "Gagal", description: error.message, variant: "destructive" });
+      }
+    };
+    
+    const handleProfileUpdate = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!userProfile) return;
+      
+      setPageLoading(true);
+      const { error: profileError } = await supabase.from('profiles').update({ full_name: editForm.full_name, phone: editForm.phone, bio: editForm.bio }).eq('id', userProfile.id);
+      const { error: muaProfileError } = await supabase.from('mua_profiles').update({ business_name: editForm.business_name, location_city: editForm.location_city, location_address: editForm.location_address }).eq('profile_id', userProfile.id);
+      
+      if (profileError || muaProfileError) {
+        toast({ title: "Error", description: profileError?.message || muaProfileError?.message || "Gagal memperbarui profil.", variant: "destructive" });
+      } else {
+        toast({ title: "Berhasil!", description: "Profil Anda telah diperbarui." });
+        await fetchAllData();
+      }
+      setPageLoading(false);
+    };
+  
+    if (pageLoading || authLoading) {
+      return <div className="min-h-screen flex items-center justify-center">Memuat...</div>;
     }
-  };
-
-  const handleProfileUpdate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!userProfile) return;
-    setPageLoading(true);
-    const { error: profileError } = await supabase.from('profiles').update({ full_name: editForm.full_name, phone: editForm.phone, bio: editForm.bio }).eq('id', userProfile.id);
-    const { error: muaProfileError } = await supabase.from('mua_profiles').update({ business_name: editForm.business_name, location_city: editForm.location_city, location_address: editForm.location_address }).eq('profile_id', userProfile.id);
-    if (profileError || muaProfileError) {
-      toast({ title: "Error", description: profileError?.message || muaProfileError?.message || "Gagal memperbarui profil.", variant: "destructive" });
-    } else {
-      toast({ title: "Berhasil!", description: "Profil Anda telah diperbarui." });
-      await fetchAllData();
-    }
-    setPageLoading(false);
-  };
-
-  if (pageLoading || authLoading) {
-    return <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-pink-50"><div className="text-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div><p className="text-gray-600">Memuat Profil...</p></div></div>;
-  }
-  if (!user) return null;
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-card to-secondary/20">
-      <div className="bg-card shadow-sm border-b border-border">
-        <div className="container mx-auto max-w-6xl px-4 py-6">
-          <div className="flex items-center justify-between">
-            <Button variant="ghost" onClick={() => navigate("/")} className="hover:bg-accent text-foreground">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Kembali ke Beranda
-            </Button>
-            <Button variant="outline" onClick={handleSignOut} className="border-border hover:bg-accent">
-              Keluar
-            </Button>
+    if (!user) return null;
+  
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-card to-secondary/20">
+        <div className="bg-card shadow-sm border-b border-border sticky top-0 z-20">
+          <div className="container mx-auto max-w-6xl px-4 py-4">
+            <div className="flex items-center justify-between">
+              <Button variant="ghost" onClick={() => navigate("/")}>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                <span className="hidden sm:inline">Beranda</span>
+              </Button>
+              <Button variant="outline" onClick={handleSignOut}>
+                Keluar
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
-
-      <div className="container mx-auto max-w-6xl px-4 py-8">
-        <Card className="mb-8 overflow-hidden border-0 shadow-lg bg-gradient-to-r from-purple-600 to-pink-600">
-          <CardContent className="p-8 text-white">
-            <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
-              <div className="relative group">
-                <Avatar className="h-24 w-24 border-4 border-white shadow-lg">
-                  <AvatarImage src={userProfile?.avatar_url || ''} />
-                  <AvatarFallback className="bg-white text-purple-600 text-2xl font-bold">
-                    {userProfile?.full_name?.charAt(0) || <User className="h-12 w-12" />}
-                  </AvatarFallback>
-                </Avatar>
-                <Label htmlFor="avatar-upload" className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-                  <Edit className="h-8 w-8 text-white" />
-                </Label>
-                <Input id="avatar-upload" type="file" className="hidden" accept="image/*" onChange={handleAvatarUpload} />
-              </div>
-              <div className="flex-1 space-y-2">
-                <h1 className="text-3xl font-bold">{muaProfile?.business_name || userProfile?.full_name}</h1>
-                <div className="flex flex-wrap gap-4 text-white/90">
-                  <div className="flex items-center gap-2">
-                    <MapPin className="h-4 w-4" />
-                    <span>{muaProfile?.location_city}</span>
+  
+        <div className="container mx-auto max-w-6xl px-4 py-8">
+          <ProfileHeader 
+            muaProfile={muaProfile} 
+            userProfile={userProfile} 
+            onAvatarUpload={handleAvatarUpload}
+          />
+  
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+            <div className="relative">
+              <div className="scroll-shadows">
+                  <div className="w-full overflow-x-auto">
+                      <TabsList className="bg-white rounded-lg shadow-sm border p-1 inline-flex">
+                          <TabsTrigger value="dashboard" className="data-[state=active]:bg-purple-100 data-[state=active]:text-purple-700 whitespace-nowrap px-4 py-2">Dashboard</TabsTrigger>
+                          <TabsTrigger value="layanan" className="data-[state=active]:bg-purple-100 data-[state=active]:text-purple-700 whitespace-nowrap px-4 py-2">Layanan & Portfolio</TabsTrigger>
+                          <TabsTrigger value="edit_profil" className="data-[state=active]:bg-purple-100 data-[state=active]:text-purple-700 whitespace-nowrap px-4 py-2">Edit Profil</TabsTrigger>
+                          <TabsTrigger value="jadwal" className="data-[state=active]:bg-purple-100 data-[state=active]:text-purple-700 whitespace-nowrap px-4 py-2">Jadwal</TabsTrigger>
+                      </TabsList>
                   </div>
-                  {userProfile?.phone && (
-                    <div className="flex items-center gap-2">
-                      <Phone className="h-4 w-4" />
-                      <span>{userProfile.phone}</span>
-                    </div>
-                  )}
-                </div>
-                {userProfile?.bio && (<p className="text-white/90 max-w-2xl">{userProfile.bio}</p>)}
-              </div>
-              <div className="flex flex-col md:flex-row gap-4">
-                <div className="text-center bg-white/20 rounded-lg p-4 backdrop-blur-sm">
-                  <div className="text-2xl font-bold">{muaProfile?.total_bookings || 0}</div>
-                  <div className="text-sm text-white/80">Total Booking</div>
-                </div>
-                <div className="text-center bg-white/20 rounded-lg p-4 backdrop-blur-sm">
-                  <div className="flex items-center justify-center gap-1">
-                    <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
-                    <span className="text-2xl font-bold">{muaProfile?.rating?.toFixed(1) || '0.0'}</span>
-                  </div>
-                  <div className="text-sm text-white/80">Rating</div>
-                </div>
               </div>
             </div>
-          </CardContent>
-        </Card>
-
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <div className="bg-white rounded-lg shadow-sm border p-1">
-            <TabsList className="grid w-full grid-cols-4 bg-transparent">
-              <TabsTrigger value="dashboard" className="data-[state=active]:bg-purple-100 data-[state=active]:text-purple-700">Dashboard</TabsTrigger>
-              <TabsTrigger value="layanan" className="data-[state=active]:bg-purple-100 data-[state=active]:text-purple-700">Layanan & Portfolio</TabsTrigger>
-              <TabsTrigger value="edit_profil" className="data-[state=active]:bg-purple-100 data-[state=active]:text-purple-700">Edit Profil</TabsTrigger>
-              <TabsTrigger value="jadwal" className="data-[state=active]:bg-purple-100 data-[state=active]:text-purple-700">Jadwal</TabsTrigger>
-            </TabsList>
-          </div>
-          
-          <TabsContent value="dashboard" className="space-y-6">
-            <div className="grid gap-6 md:grid-cols-3">
-              <Card className="border-0 shadow-lg bg-gradient-to-br from-blue-50 to-blue-100">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Pesanan Bulan Ini</p>
-                      <p className="text-3xl font-bold text-blue-600">{bookings.filter(b => new Date(b.booking_date).getMonth() === new Date().getMonth()).length}</p>
-                    </div>
-                    <CalendarIcon className="h-12 w-12 text-blue-500/50" />
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="border-0 shadow-lg bg-gradient-to-br from-green-50 to-green-100">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Pendapatan Bulan Ini</p>
-                      <p className="text-3xl font-bold text-green-600">{formatCurrency(bookings.filter(b => new Date(b.booking_date).getMonth() === new Date().getMonth() && b.status === 'completed').reduce((sum, b) => sum + b.total_price, 0))}</p>
-                    </div>
-                    <DollarSign className="h-12 w-12 text-green-500/50" />
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="border-0 shadow-lg bg-gradient-to-br from-purple-50 to-purple-100">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Layanan Aktif</p>
-                      <p className="text-3xl font-bold text-purple-600">{services.filter(s => s.is_active).length}</p>
-                    </div>
-                    <Star className="h-12 w-12 text-purple-500/50" />
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-            <Card className="border-0 shadow-lg">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Clock className="h-5 w-5 text-purple-600" />
-                  Pesanan Terbaru
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {bookings.slice(0, 5).map(booking => (
-                    <div key={booking.id} className="p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <h4 className="font-medium">{booking.profiles?.full_name}</h4>
-                            <Badge className={`${getStatusColor(booking.status)} border-0`}>{booking.status}</Badge>
-                            <Badge variant={booking.payments?.payment_status === 'paid' ? 'default' : 'destructive'}>
-                              {booking.payments?.payment_status === 'paid' ? 'Sudah Bayar' : 'Belum Bayar'}
-                            </Badge>
-                          </div>
-                          <p className="text-sm text-gray-600">{booking.services?.name}</p>
-                          <p className="text-xs text-gray-500">{new Date(booking.booking_date).toLocaleDateString('id-ID')} • {booking.booking_time}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-semibold text-purple-600">{formatCurrency(booking.total_price)}</p>
-                        </div>
-                      </div>
-                      {booking.payments?.payment_status === 'paid' && booking.status === 'accepted' && (
-                        <div className="mt-4 border-t pt-4">
-                            <p className="text-sm font-medium mb-2">Status Transportasi</p>
-                            <div className="h-40 bg-gray-200 rounded-md flex items-center justify-center">
-                                <p className="text-gray-500">Peta Transportasi Menjemput...</p>
-                            </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                  {bookings.length === 0 && (<div className="text-center py-12 text-gray-500"><CalendarIcon className="h-12 w-12 mx-auto mb-4 opacity-50" /><p>Belum ada pesanan</p></div>)}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="layanan" className="space-y-6">
-            <Card className="border-0 shadow-lg">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Eye className="h-5 w-5 text-purple-600" />Galeri Portfolio</CardTitle>
-                <CardDescription>Pilih foto, lalu klik ikon gambar untuk menjadikannya foto utama.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                  {(muaProfile?.portfolio_images || []).map((url, index) => (<div key={index} className="relative aspect-square group">
-                    {muaProfile?.cover_image_url === url && (<div className="absolute inset-0 ring-4 ring-purple-500 rounded-lg pointer-events-none z-10"><Badge className="absolute top-2 left-2">Utama</Badge></div>)}
-                    <img src={url} alt={`Portfolio ${index+1}`} className="w-full h-full object-cover rounded-lg shadow-md" />
-                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors rounded-lg flex items-center justify-center gap-2">
-                        <Button variant="outline" size="icon" className="h-10 w-10 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => handleSetCoverImage(url)}>
-                            <ImageIcon className="h-5 w-5" />
-                        </Button>
-                        <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                                <Button variant="destructive" size="icon" className="h-10 w-10 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="h-5 w-5" /></Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                                <AlertDialogHeader><AlertDialogTitle>Anda Yakin?</AlertDialogTitle><AlertDialogDescription>Tindakan ini tidak dapat diurungkan. Foto akan dihapus permanen.</AlertDialogDescription></AlertDialogHeader>
-                                <AlertDialogFooter><AlertDialogCancel>Batal</AlertDialogCancel><AlertDialogAction onClick={() => handleDeletePortfolioImage(url)}>Ya, Hapus</AlertDialogAction></AlertDialogFooter>
-                            </AlertDialogContent>
-                        </AlertDialog>
-                    </div>
-                  </div>))}
-                  {previewImage && (<div className="relative aspect-square group col-span-full md:col-span-1 border-2 border-dashed border-purple-200 rounded-lg p-2"><img src={previewImage} alt="Pratinjau" className="w-full h-full object-cover rounded-md" /><Button variant="destructive" size="icon" className="absolute -top-3 -right-3 h-7 w-7 rounded-full" onClick={() => { setPreviewImage(null); setSelectedFile(null); }}><X className="h-4 w-4" /></Button></div>)}
-                  {(muaProfile?.portfolio_images || []).length === 0 && !previewImage && (<div className="col-span-full text-center py-12 text-gray-500 border-2 border-dashed border-gray-200 rounded-lg"><Upload className="h-12 w-12 mx-auto mb-4 opacity-50" /><p>Belum ada foto portfolio</p></div>)}
-                </div>
-                <div className="flex items-center gap-4">
-                  <Label htmlFor="portfolio-upload" className="cursor-pointer">
-                    <Button asChild variant="outline" className="border-purple-200 hover:bg-purple-50"><span className="flex items-center gap-2"><Upload className="h-4 w-4"/>{previewImage ? 'Ganti Foto' : 'Pilih Foto'}</span></Button>
-                  </Label>
-                  <Input id="portfolio-upload" type="file" className="hidden" accept="image/*" onChange={handleFileSelect} />
-                  {previewImage && (<Button onClick={handleConfirmUpload} disabled={uploading} className="bg-purple-600 hover:bg-purple-700">{uploading ? 'Mengunggah...' : 'Unggah Sekarang'}</Button>)}
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="border-0 shadow-lg">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Star className="h-5 w-5 text-purple-600" />Layanan Makeup</CardTitle>
-                <CardDescription>Kelola paket layanan dan harga yang Anda tawarkan.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4 mb-8">
-                  {services.map(service => (<div key={service.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                    <div className="flex items-center gap-4">
-                      <img src={service.image_url || '/placeholder.svg'} alt={service.name} className="h-16 w-16 rounded-md object-cover"/>
-                      <div>
-                        <h4 className="font-medium">{service.name}</h4>
-                        <p className="text-sm text-purple-600 font-semibold">{formatCurrency(service.price_min)}</p>
-                        <Badge variant={service.is_active ? "default" : "secondary"}>{service.is_active ? "Aktif" : "Nonaktif"}</Badge>
-                      </div>
-                    </div>
-                    <Button variant="outline" size="sm" onClick={() => handleOpenEditModal(service)}><Edit className="h-4 w-4 mr-2"/>Edit</Button>
-                  </div>))}
-                  {services.length === 0 && (<div className="text-center py-12 text-gray-500"><Star className="h-12 w-12 mx-auto mb-4 opacity-50" /><p>Belum ada layanan ditambahkan</p></div>)}
-                </div>
-                <Card className="bg-purple-50/60 border-purple-200">
-                  <CardHeader><CardTitle className="text-lg">Tambah Jasa Baru</CardTitle></CardHeader>
-                  <CardContent>
-                    <form onSubmit={handleAddNewService} className="space-y-4">
-                      <div className="flex flex-col md:flex-row gap-6">
-                        <div className="flex-1 space-y-4">
-                          <div className="space-y-1"><Label htmlFor="name">Nama Jasa</Label><Input id="name" name="name" value={newService.name} onChange={handleNewServiceChange} placeholder="cth: Makeup Wisuda" required /></div>
-                          <div className="space-y-1"><Label htmlFor="description">Deskripsi Singkat</Label><Textarea id="description" name="description" value={newService.description} onChange={handleNewServiceChange} placeholder="Tahan lama, flawless, dll." required /></div>
-                          <div className="flex gap-4">
-                            <div className="space-y-1 w-1/2"><Label htmlFor="price_min">Harga (Rp)</Label><Input id="price_min" name="price_min" type="number" value={newService.price_min} onChange={handleNewServiceChange} required /></div>
-                            <div className="space-y-1 w-1/2"><Label htmlFor="duration_minutes">Durasi (menit)</Label><Input id="duration_minutes" name="duration_minutes" type="number" value={newService.duration_minutes} onChange={handleNewServiceChange} required /></div>
-                          </div>
-                        </div>
-                        <div className="flex-1">
-                          <Label>Foto Layanan</Label>
-                          <div className="mt-1 aspect-video border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center bg-white">
-                            {newServicePreview ? (<img src={newServicePreview} alt="Pratinjau layanan" className="h-full w-full object-cover rounded-md" />) : (<div className="text-center text-gray-500"><Upload className="mx-auto h-8 w-8" /><p className="text-sm">Pilih gambar</p></div>)}
-                          </div>
-                          <Input id="service-image-upload" type="file" className="mt-2" accept="image/*" onChange={handleNewServiceFileSelect} required/>
-                        </div>
-                      </div>
-                      <div className="flex justify-end"><Button type="submit" disabled={isAddingService} className="bg-purple-600 hover:bg-purple-700">{isAddingService ? "Menyimpan..." : "Simpan Jasa"}<Save className="h-4 w-4 ml-2" /></Button></div>
-                    </form>
-                  </CardContent>
-                </Card>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="edit_profil">
-            <Card className="border-0 shadow-lg">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Settings className="h-5 w-5 text-purple-600" />Edit Profil</CardTitle>
-                <CardDescription>Update informasi profil dan bisnis Anda</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleProfileUpdate} className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2"><Label htmlFor="business_name">Nama Bisnis</Label><Input id="business_name" value={editForm.business_name} onChange={(e) => setEditForm({...editForm, business_name: e.target.value})} className="border-gray-200 focus:border-purple-400"/></div>
-                    <div className="space-y-2"><Label htmlFor="full_name">Nama Lengkap</Label><Input id="full_name" value={editForm.full_name} onChange={(e) => setEditForm({...editForm, full_name: e.target.value})} className="border-gray-200 focus:border-purple-400"/></div>
-                    <div className="space-y-2"><Label htmlFor="phone">Nomor Telepon</Label><Input id="phone" value={editForm.phone} onChange={(e) => setEditForm({...editForm, phone: e.target.value})} className="border-gray-200 focus:border-purple-400"/></div>
-                    <div className="space-y-2"><Label htmlFor="location_city">Kota</Label><Input id="location_city" value={editForm.location_city} onChange={(e) => setEditForm({...editForm, location_city: e.target.value})} className="border-gray-200 focus:border-purple-400"/></div>
-                  </div>
-                  <div className="space-y-2"><Label htmlFor="location_address">Alamat Lengkap</Label><Textarea id="location_address" value={editForm.location_address} onChange={(e) => setEditForm({...editForm, location_address: e.target.value})} placeholder="Jalan, nomor, kelurahan, kecamatan..." className="border-gray-200 focus:border-purple-400"/></div>
-                  <div className="space-y-2"><Label htmlFor="bio">Bio / Deskripsi</Label><Textarea id="bio" value={editForm.bio} onChange={(e) => setEditForm({...editForm, bio: e.target.value})} placeholder="Ceritakan tentang keahlian dan pengalaman Anda..." className="border-gray-200 focus:border-purple-400"/></div>
-                  <div className="flex justify-end"><Button type="submit" className="bg-purple-600 hover:bg-purple-700"><Save className="h-4 w-4 mr-2" />Simpan Perubahan</Button></div>
-                </form>
-              </CardContent>
-            </Card>
-          </TabsContent>
-          
-          <TabsContent value="jadwal">
-            <Card className="border-0 shadow-lg">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2"><CalendarIcon className="h-5 w-5 text-purple-600" />Atur Ketersediaan</CardTitle>
-                <CardDescription>Kelola jadwal dan ketersediaan Anda. Pilih tanggal di mana Anda tidak bersedia menerima pesanan.</CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-col items-center gap-4">
-                <Calendar mode="multiple" selected={unavailableDates} onSelect={setUnavailableDates} disabled={(date) => date < new Date(new Date().setDate(new Date().getDate() - 1))} className="p-0 border rounded-lg" />
-                <div className="flex items-center gap-2 text-sm text-muted-foreground self-start mt-2 border p-2 rounded-md">
-                    <div className="h-4 w-4 rounded-sm bg-primary"></div>
-                    <span>Tanggal yang ditandai = Tidak Tersedia</span>
-                </div>
-              </CardContent>
-              <div className="p-6 pt-0 flex justify-end"><Button className="bg-purple-600 hover:bg-purple-700"><CheckCircle className="h-4 w-4 mr-2" />Simpan Jadwal</Button></div>
-            </Card>
-          </TabsContent>
-        </Tabs>
-
-        <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-            <DialogContent className="max-w-3xl">
-                <DialogHeader>
-                    <DialogTitle>Edit Jasa Makeup</DialogTitle>
-                </DialogHeader>
-                {editingService && (
-                    <form onSubmit={handleUpdateService} className="space-y-4">
-                        <div className="flex flex-col md:flex-row gap-6">
-                            <div className="flex-1 space-y-4">
-                                <div className="space-y-1"><Label htmlFor="edit-name">Nama Jasa</Label><Input id="edit-name" name="name" value={editingService.name} onChange={handleEditServiceChange} required /></div>
-                                <div className="space-y-1"><Label htmlFor="edit-description">Deskripsi</Label><Textarea id="edit-description" name="description" value={editingService.description || ''} onChange={handleEditServiceChange} required /></div>
-                                <div className="flex gap-4">
-                                    <div className="space-y-1 w-1/2"><Label htmlFor="edit-price_min">Harga (Rp)</Label><Input id="edit-price_min" name="price_min" type="number" value={editingService.price_min} onChange={handleEditServiceChange} required /></div>
-                                    <div className="space-y-1 w-1/2"><Label htmlFor="edit-duration_minutes">Durasi (menit)</Label><Input id="edit-duration_minutes" name="duration_minutes" type="number" value={editingService.duration_minutes || 0} onChange={handleEditServiceChange} required /></div>
-                                </div>
-                            </div>
-                            <div className="flex-1">
-                                <Label>Foto Layanan</Label>
-                                <div className="mt-1 aspect-video border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center bg-white">
-                                    {editServicePreview ? (<img src={editServicePreview} alt="Pratinjau" className="h-full w-full object-cover rounded-md" />) : (<div className="text-center text-gray-500"><p>Tidak ada gambar</p></div>)}
-                                </div>
-                                <Input id="edit-service-image-upload" type="file" className="mt-2" accept="image/*" onChange={handleEditServiceFileSelect}/>
-                            </div>
-                        </div>
-                        <DialogFooter>
-                            <Button type="button" variant="ghost" onClick={() => setIsEditModalOpen(false)}>Batal</Button>
-                            <Button type="submit" disabled={isAddingService} className="bg-purple-600 hover:bg-purple-700">{isAddingService ? "Menyimpan..." : "Simpan Perubahan"}</Button>
-                        </DialogFooter>
-                    </form>
-                )}
-            </DialogContent>
-        </Dialog>
+            
+            <TabsContent value="dashboard">
+              <DashboardTab bookings={bookings} services={services} />
+            </TabsContent>
+            
+            <TabsContent value="layanan">
+              <ServicesPortfolioTab 
+                muaProfile={muaProfile}
+                services={services}
+                onPortfolioUpload={handlePortfolioUpload}
+                onServiceAdded={fetchAllData}
+              />
+            </TabsContent>
+            
+            <TabsContent value="edit_profil">
+              <EditProfileTab
+                editForm={editForm}
+                setEditForm={setEditForm}
+                onSubmit={handleProfileUpdate}
+              />
+            </TabsContent>
+            
+            <TabsContent value="jadwal">
+              <ScheduleTab
+                unavailableDates={unavailableDates}
+                setUnavailableDates={setUnavailableDates}
+              />
+            </TabsContent>
+          </Tabs>
+        </div>
       </div>
-    </div>
-  );
+    );
 };
 
 export default MUAProfile;

@@ -1,3 +1,4 @@
+
 export interface MUAProfile {
   id: string;
   business_name: string | null;
@@ -9,6 +10,8 @@ export interface MUAProfile {
   is_available: boolean | null;
   portfolio_images: string[] | null;
   profile_id: string;
+  specializations: string[] | null;
+  cover_image_url: string | null;
 }
 
 export interface UserProfile {
@@ -28,6 +31,7 @@ export interface Booking {
   customer_notes: string | null;
   profiles: { full_name: string; };
   services: { name: string; };
+  payments: { payment_status: string; } | null;
 }
 
 export interface Service {

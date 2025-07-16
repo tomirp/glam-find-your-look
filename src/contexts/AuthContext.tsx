@@ -143,15 +143,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return { error };
   };
 
-  const signOut = async () => {
+   const signOut = async () => {
     setLoading(true);
     const { error } = await supabase.auth.signOut();
-    if (!error) {
-      setUser(null);
-      setSession(null);
-      setRole(null);
-      setMuaProfileExists(null);
-    }
+    
+    // PERBAIKAN: Selalu bersihkan state lokal setelah logout
+    // untuk memastikan UI diperbarui secara instan.
+    setUser(null);
+    setSession(null);
+    setRole(null);
+    setMuaProfileExists(null);
+
     setLoading(false);
     return { error };
   };

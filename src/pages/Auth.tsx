@@ -26,21 +26,33 @@ const Auth = () => {
   });
 
   useEffect(() => {
-    if (authLoading) return;
-
-    if (user && role) {
-      if (loginRedirect) {
-        navigate(loginRedirect.pathname, { state: loginRedirect.state, replace: true });
-        clearLoginRedirect();
-      } else {
-        if (role === 'mua') {
-          navigate(muaProfileExists ? '/mua/profile' : '/mua/onboarding');
-        } else if (role === 'customer') {
-          navigate('/customer/profile');
-        }
-      }
+    // Jika proses autentikasi masih berjalan atau user belum login, jangan lakukan apa-apa.
+    if (authLoading || !user) {
+      return;
     }
+
+    // PERBAIKAN: Untuk MUA, tunggu hingga pengecekan profil selesai (muaProfileExists tidak lagi null).
+    if (role === 'mua' && muaProfileExists === null) {
+      return;
+    }
+
+    // Jika ada redirect yang tertunda (misalnya, akses halaman terproteksi sebelum login),
+    // arahkan ke sana terlebih dahulu.
+    if (loginRedirect) {
+      navigate(loginRedirect.pathname, { state: loginRedirect.state, replace: true });
+      clearLoginRedirect();
+      return;
+    }
+
+    // Logika redirect standar setelah login berhasil dan pengecekan profil selesai.
+    if (role === 'mua') {
+      navigate(muaProfileExists ? '/mua/profile' : '/mua/onboarding', { replace: true });
+    } else if (role === 'customer') {
+      navigate('/customer/profile', { replace: true });
+    }
+    
   }, [user, role, authLoading, muaProfileExists, navigate, loginRedirect, clearLoginRedirect]);
+
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();

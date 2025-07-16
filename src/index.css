@@ -103,6 +103,10 @@ All colors MUST be HSL.
   }
 }
 
+* {
+    @apply border-border;
+  }
+
 @layer base {
   * {
     @apply border-border;
@@ -125,5 +129,38 @@ All colors MUST be HSL.
   
   .font-body {
     font-family: 'Poppins', sans-serif;
+  }
+}
+
+@layer utilities {
+  .scroll-shadows {
+    position: relative;
+  }
+  .scroll-shadows::before,
+  .scroll-shadows::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2rem; /* Lebar gradasi */
+    pointer-events: none;
+    z-index: 10;
+  }
+  .scroll-shadows::before {
+    left: 0;
+    background: linear-gradient(to right, hsl(var(--card)), transparent);
+  }
+  .scroll-shadows::after {
+    right: 0;
+    background: linear-gradient(to left, hsl(var(--card)), transparent);
+  }
+
+  /* Sembunyikan scrollbar bawaan */
+  .overflow-x-auto::-webkit-scrollbar {
+    display: none;
+  }
+  .overflow-x-auto {
+    -ms-overflow-style: none;  /* IE dan Edge */
+    scrollbar-width: none;  /* Firefox */
   }
 }
