@@ -379,7 +379,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      cancel_booking: {
+        Args: { p_booking_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       booking_status:

@@ -8,6 +8,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { CalendarIcon, DollarSign, Star, Clock, XCircle } from "lucide-react";
 import { Booking, Service } from "./types";
 import { formatCurrency, getStatusColor } from "./utils";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 
 interface DashboardTabProps {
@@ -28,21 +39,16 @@ export const DashboardTab = ({ bookings, services, onBookingUpdate }: DashboardT
   const { toast } = useToast();
 
   const handleCancelBooking = async (bookingId: string) => {
-    if (!window.confirm("Apakah Anda yakin ingin membatalkan pesanan ini? Aksi ini tidak dapat diurungkan.")) {
-      return;
-    }
     toast({ description: "Membatalkan pesanan..." });
     try {
-      // Kita asumsikan 'rejected' adalah status untuk pesanan yang dibatalkan oleh MUA
-      const { error } = await supabase
-        .from('bookings')
-        .update({ status: 'rejected' }) 
-        .eq('id', bookingId);
+      const { error } = await supabase.rpc('cancel_booking', {
+        p_booking_id: bookingId
+      });
 
       if (error) throw error;
 
       toast({ title: "Berhasil", description: "Pesanan telah dibatalkan." });
-      onBookingUpdate(); // Memanggil fungsi refresh dari MUAProfile.tsx
+      onBookingUpdate();
     } catch (error: any) {
       toast({ title: "Gagal", description: error.message, variant: "destructive" });
     }
@@ -109,16 +115,34 @@ export const DashboardTab = ({ bookings, services, onBookingUpdate }: DashboardT
                     <div className="flex-shrink-0 text-right flex flex-col items-end gap-2">
                         <p className="font-semibold text-purple-600 whitespace-nowrap">{formatCurrency(booking.total_price)}</p>
                         {/* PERUBAHAN: Tombol Batal akan muncul jika statusnya sesuai */}
-                        {(booking.status === 'pending' || booking.status === 'accepted') && (
-                           <Button
-                              variant="destructive"
-                              size="sm"
-                              className="text-xs h-7 px-2"
-                              onClick={() => handleCancelBooking(booking.id)}
-                            >
-                              <XCircle className="h-3 w-3 mr-1" />
-                              Batalkan
-                            </Button>
+                          {(booking.status === 'pending' || booking.status === 'accepted') && (
+                           // PERUBAHAN: Tombol "Batalkan" sekarang dibungkus dengan AlertDialog
+                           <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  className="text-xs h-7 px-2"
+                                >
+                                  <XCircle className="h-3 w-3 mr-1" />
+                                  Batalkan
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Apakah Anda Yakin?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Aksi ini akan membatalkan pesanan dari pelanggan. Aksi ini tidak dapat diurungkan.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Tidak, Kembali</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => handleCancelBooking(booking.id)}>
+                                    Ya, Batalkan Pesanan
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
                         )}
                     </div>
                 </div>
