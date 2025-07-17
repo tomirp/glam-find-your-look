@@ -316,7 +316,7 @@ const CustomerProfile = () => {
             </Card>
           </TabsContent>
           
-          <TabsContent value="pembayaran">
+           <TabsContent value="pembayaran">
             <Card className="border-0 shadow-lg">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 font-heading">
@@ -325,9 +325,13 @@ const CustomerProfile = () => {
                 </CardTitle>
                 <CardDescription>Kelola metode pembayaran untuk transaksi yang lebih cepat dan mudah</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid gap-6">
-                  <div className="border border-border p-6 rounded-xl flex items-center justify-between hover:bg-accent/30 transition-all duration-200">
+              <CardContent>
+                {/* PERUBAHAN: Menggunakan space-y-4 untuk jarak antar kartu */}
+                <div className="space-y-4">
+
+                  {/* Kartu Kredit / Debit */}
+                  {/* PERUBAHAN: Dibuat responsif dengan flex-col dan sm:flex-row */}
+                  <div className="border border-border p-4 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 hover:bg-accent/30 transition-all duration-200">
                     <div className="flex items-center gap-4">
                       <div className="bg-gradient-to-r from-blue-500 to-purple-600 p-4 rounded-xl shadow-lg">
                         <CreditCard className="h-6 w-6 text-white"/>
@@ -337,12 +341,14 @@ const CustomerProfile = () => {
                         <p className="text-sm text-muted-foreground">Visa, Mastercard, JCB</p>
                       </div>
                     </div>
-                    <Button variant="outline" className="border-border hover:bg-accent">
+                    <Button variant="outline" className="border-border hover:bg-accent w-full sm:w-auto mt-2 sm:mt-0">
                       <PlusCircle className="h-4 w-4 mr-2"/>
                       Tambah Kartu
                     </Button>
                   </div>
-                  <div className="border border-border p-6 rounded-xl flex items-center justify-between hover:bg-accent/30 transition-all duration-200">
+
+                  {/* E-Wallet */}
+                  <div className="border border-border p-4 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 hover:bg-accent/30 transition-all duration-200">
                     <div className="flex items-center gap-4">
                       <div className="bg-gradient-to-r from-green-500 to-blue-500 p-4 rounded-xl shadow-lg">
                         <Wallet className="h-6 w-6 text-white"/>
@@ -352,11 +358,13 @@ const CustomerProfile = () => {
                         <p className="text-sm text-muted-foreground">GoPay, OVO, DANA, ShopeePay</p>
                       </div>
                     </div>
-                    <Button variant="outline" className="border-border hover:bg-accent">
+                    <Button variant="outline" className="border-border hover:bg-accent w-full sm:w-auto mt-2 sm:mt-0">
                       Hubungkan
                     </Button>
                   </div>
-                  <div className="border border-green-200 bg-green-50 p-6 rounded-xl flex items-center justify-between">
+
+                  {/* QRIS */}
+                  <div className="border border-green-200 bg-green-50/50 p-4 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <div className="flex items-center gap-4">
                       <div className="bg-gradient-to-r from-primary to-secondary p-4 rounded-xl shadow-lg">
                         <QrCode className="h-6 w-6 text-primary-foreground"/>
@@ -366,11 +374,12 @@ const CustomerProfile = () => {
                         <p className="text-sm text-muted-foreground">Pembayaran universal dengan QR Code</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 text-green-600">
+                    <div className="flex items-center gap-2 text-green-600 font-medium w-full sm:w-auto justify-end mt-2 sm:mt-0">
                       <ShieldCheck className="h-5 w-5"/>
-                      <span className="text-sm font-medium">Siap Digunakan</span>
+                      <span>Siap Digunakan</span>
                     </div>
                   </div>
+
                 </div>
               </CardContent>
             </Card>

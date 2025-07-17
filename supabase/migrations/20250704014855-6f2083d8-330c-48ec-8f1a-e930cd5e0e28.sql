@@ -130,21 +130,28 @@ CREATE POLICY "MUA can manage their own services" ON public.services FOR ALL USI
 
 -- RLS policies for bookings
 CREATE POLICY "Users can view their own bookings" ON public.bookings FOR SELECT USING (
-  EXISTS (SELECT 1 FROM public.profiles WHERE id = customer_id AND user_id = auth.uid())
-  OR EXISTS (
-    SELECT 1 FROM public.mua_profiles mp 
-    JOIN public.profiles p ON mp.profile_id = p.id 
-    WHERE mp.id = mua_profile_id AND p.user_id = auth.uid()
-  )
+  -- Customer can see their bookings
+  (EXISTS (SELECT 1 FROM public.profiles WHERE id = bookings.customer_id AND user_id = auth.uid())) OR
+  -- MUA can see bookings assigned to them
+  (EXISTS (
+    SELECT 1 FROM public.mua_profiles mp
+    JOIN public.profiles p ON mp.profile_id = p.id
+    WHERE mp.id = bookings.mua_profile_id AND p.user_id = auth.uid()
+  ))
 );
+
 CREATE POLICY "Authenticated users can create bookings" ON public.bookings FOR INSERT TO authenticated WITH CHECK (true);
-CREATE POLICY "Users can update their own bookings" ON public.bookings FOR UPDATE USING (
-  EXISTS (SELECT 1 FROM public.profiles WHERE id = customer_id AND user_id = auth.uid())
-  OR EXISTS (
-    SELECT 1 FROM public.mua_profiles mp 
-    JOIN public.profiles p ON mp.profile_id = p.id 
-    WHERE mp.id = mua_profile_id AND p.user_id = auth.uid()
-  )
+
+-- PERBAIKAN UTAMA: Kebijakan UPDATE yang lebih spesifik
+CREATE POLICY "Users can update their own bookings (customer or MUA)" ON public.bookings FOR UPDATE USING (
+  -- Customer can update their own booking
+  (EXISTS (SELECT 1 FROM public.profiles WHERE id = bookings.customer_id AND user_id = auth.uid())) OR
+  -- MUA can update a booking assigned to them
+  (EXISTS (
+    SELECT 1 FROM public.mua_profiles mp
+    JOIN public.profiles p ON mp.profile_id = p.id
+    WHERE mp.id = bookings.mua_profile_id AND p.user_id = auth.uid()
+  ))
 );
 
 -- RLS policies for reviews
@@ -159,14 +166,24 @@ CREATE POLICY "Customers can create reviews for their completed bookings" ON pub
 
 -- RLS policies for payments
 CREATE POLICY "Users can view their own payments" ON public.payments FOR SELECT USING (
-  EXISTS (SELECT 1 FROM public.profiles WHERE id = customer_id AND user_id = auth.uid())
-  OR EXISTS (
-    SELECT 1 FROM public.bookings b 
-    JOIN public.mua_profiles mp ON b.mua_profile_id = mp.id 
-    JOIN public.profiles p ON mp.profile_id = p.id 
-    WHERE b.id = booking_id AND p.user_id = auth.uid()
-  )
+    -- Customer can see their own payments
+    (EXISTS (SELECT 1 FROM public.profiles WHERE id = payments.customer_id AND user_id = auth.uid())) OR
+    -- MUA can see payments related to their bookings
+    (EXISTS (
+        SELECT 1 FROM public.bookings b
+        JOIN public.mua_profiles mp ON b.mua_profile_id = mp.id
+        JOIN public.profiles p ON mp.profile_id = p.id
+        WHERE b.id = payments.booking_id AND p.user_id = auth.uid()
+    ))
 );
+
+CREATE POLICY "Users can update their own payments" ON public.payments FOR UPDATE USING (
+    EXISTS (
+        SELECT 1 FROM public.profiles
+        WHERE profiles.id = payments.customer_id AND profiles.user_id = auth.uid()
+    )
+);
+
 -- **PERBAIKAN KEBIJAKAN INSERT PAYMENT DI SINI**
 CREATE POLICY "Users can create payments for their own bookings" ON public.payments FOR INSERT WITH CHECK (
     EXISTS (

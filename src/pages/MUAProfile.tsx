@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
-import { ArrowLeft, User, Star, MapPin, Phone, Trash2, Calendar as CalendarIcon, DollarSign, Settings, Save, PlusCircle, Upload, Eye, Clock, CheckCircle, X, Edit, Image as ImageIcon } from "lucide-react";
+import { XCircle, ArrowLeft, User, Star, MapPin, Phone, Trash2, Calendar as CalendarIcon, DollarSign, Settings, Save, PlusCircle, Upload, Eye, Clock, CheckCircle, X, Edit, Image as ImageIcon } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,8 +35,10 @@ import { EditProfileTab } from "@/components/MUAProfile/EditProfileTab";
 import { ScheduleTab } from "@/components/MUAProfile/ScheduleTab";
 import { ProfileHeader } from "@/components/MUAProfile/ProfileHeader";
 
+
 // PERBAIKAN: Menggunakan `import type` untuk menghindari konflik nama
 import type { MUAProfile as MUAProfileType, UserProfile, Booking, Service, EditForm } from "@/components/MUAProfile/types";
+
 
 
 const MUAProfile = () => {
@@ -222,7 +224,11 @@ const MUAProfile = () => {
             </div>
             
             <TabsContent value="dashboard">
-              <DashboardTab bookings={bookings} services={services} />
+              <DashboardTab 
+                bookings={bookings} 
+                services={services} 
+                onBookingUpdate={fetchAllData} // PERUBAHAN: Teruskan fungsi refresh ke DashboardTab
+              />
             </TabsContent>
             
              <TabsContent value="layanan">
