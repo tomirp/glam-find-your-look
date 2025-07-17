@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, User, Star, MapPin, Phone, Save, CreditCard, Wallet, QrCode, PlusCircle, ShieldCheck, Clock, Calendar, Heart, Settings, BookOpen } from "lucide-react";
+import { ArrowLeft, User, Star, MapPin, Phone, Save, CreditCard, Wallet, QrCode, PlusCircle, ShieldCheck, Clock, Calendar, Heart, Settings, BookOpen, LogOut } from "lucide-react";
 
 // --- INTERFACE (Tipe Data) ---
 interface UserProfile {
@@ -68,10 +68,8 @@ const CustomerProfile = () => {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [pageLoading, setPageLoading] = useState(true);
 
-  // State untuk form edit
   const [editForm, setEditForm] = useState({ full_name: "", phone: "", address: "" });
 
-  // Fungsi untuk mengambil semua data yang relevan untuk klien
   const fetchAllData = async () => {
     if (!user) return;
     setPageLoading(true);
@@ -147,16 +145,17 @@ const CustomerProfile = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-card to-secondary/20">
-      {/* Header */}
-      <div className="bg-card shadow-sm border-b border-border">
-        <div className="container mx-auto max-w-5xl px-4 py-6">
+      {/* PERUBAHAN: Header didesain ulang mirip MUA Profile */}
+      <div className="bg-card shadow-sm border-b border-border sticky top-0 z-20">
+        <div className="container mx-auto max-w-5xl px-4 py-4">
           <div className="flex items-center justify-between">
-            <Button variant="ghost" onClick={() => navigate("/")} className="hover:bg-accent text-foreground">
+            <Button variant="ghost" onClick={() => navigate("/")}>
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Kembali ke Beranda
+              <span className="hidden sm:inline">Kembali ke Beranda</span>
             </Button>
-            <Button variant="outline" onClick={handleSignOut} className="border-border hover:bg-accent">
-              Keluar
+            <Button variant="outline" onClick={handleSignOut}>
+              <LogOut className="h-4 w-4 mr-2 sm:mr-2" />
+              <span className="hidden sm:inline">Keluar</span>
             </Button>
           </div>
         </div>
@@ -209,25 +208,26 @@ const CustomerProfile = () => {
 
         {/* Main Content Tabs */}
         <Tabs defaultValue="riwayat" className="space-y-6">
-          <div className="bg-card rounded-xl shadow-sm border border-border p-2">
-            <TabsList className="grid w-full grid-cols-4 bg-transparent">
-              <TabsTrigger value="riwayat" className="data-[state=active]:bg-accent data-[state=active]:text-foreground font-medium">
-                <BookOpen className="h-4 w-4 mr-2" />
-                Riwayat Booking
-              </TabsTrigger>
-              <TabsTrigger value="ulasan" className="data-[state=active]:bg-accent data-[state=active]:text-foreground font-medium">
-                <Heart className="h-4 w-4 mr-2" />
-                Ulasan Saya
-              </TabsTrigger>
-              <TabsTrigger value="pembayaran" className="data-[state=active]:bg-accent data-[state=active]:text-foreground font-medium">
-                <CreditCard className="h-4 w-4 mr-2" />
-                Pembayaran
-              </TabsTrigger>
-              <TabsTrigger value="profil" className="data-[state=active]:bg-accent data-[state=active]:text-foreground font-medium">
-                <Settings className="h-4 w-4 mr-2" />
-                Edit Profil
-              </TabsTrigger>
-            </TabsList>
+          {/* PERUBAHAN: Menggunakan struktur div dan class yang sama dengan MUAProfile.tsx */}
+          <div className="relative">
+            <div className="scroll-shadows bg-card rounded-xl shadow-sm border border-border p-2">
+              <div className="w-full overflow-x-auto">
+                <TabsList className="bg-transparent p-1 inline-flex">
+                  <TabsTrigger value="riwayat" className="data-[state=active]:bg-accent data-[state=active]:text-foreground font-medium whitespace-nowrap px-4 py-2">
+                    <BookOpen className="h-4 w-4 mr-2" /> Riwayat Booking
+                  </TabsTrigger>
+                  <TabsTrigger value="ulasan" className="data-[state=active]:bg-accent data-[state=active]:text-foreground font-medium whitespace-nowrap px-4 py-2">
+                    <Heart className="h-4 w-4 mr-2" /> Ulasan Saya
+                  </TabsTrigger>
+                  <TabsTrigger value="pembayaran" className="data-[state=active]:bg-accent data-[state=active]:text-foreground font-medium whitespace-nowrap px-4 py-2">
+                    <CreditCard className="h-4 w-4 mr-2" /> Pembayaran
+                  </TabsTrigger>
+                  <TabsTrigger value="profil" className="data-[state=active]:bg-accent data-[state=active]:text-foreground font-medium whitespace-nowrap px-4 py-2">
+                    <Settings className="h-4 w-4 mr-2" /> Edit Profil
+                  </TabsTrigger>
+                </TabsList>
+              </div>
+            </div>
           </div>
 
           <TabsContent value="riwayat">
@@ -242,21 +242,26 @@ const CustomerProfile = () => {
               <CardContent>
                 <div className="space-y-4">
                   {bookings.length > 0 ? bookings.map(booking => (
-                    <div key={booking.id} className="flex items-center justify-between p-6 bg-accent/30 rounded-xl hover:bg-accent/50 transition-all duration-200 border border-border">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <h4 className="font-semibold font-heading text-foreground">{booking.mua_profiles?.business_name || 'N/A'}</h4>
-                          <Badge className={`${getStatusColor(booking.status)} border`}>{booking.status}</Badge>
-                          <Badge variant={booking.payments?.payment_status === 'paid' ? 'default' : 'destructive'}>{booking.payments?.payment_status === 'paid' ? 'Lunas' : 'Belum Lunas'}</Badge>
+                    <div key={booking.id} className="p-4 sm:p-6 bg-accent/30 rounded-xl hover:bg-accent/50 transition-all duration-200 border border-border">
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                        {/* Kolom Info Utama */}
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-semibold font-heading text-lg text-foreground truncate">{booking.mua_profiles?.business_name || 'N/A'}</h4>
+                          <p className="text-sm text-muted-foreground mb-2">{booking.services?.name || 'N/A'}</p>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <Calendar className="h-3.5 w-3.5" />
+                            <span>{new Date(booking.booking_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                          </div>
                         </div>
-                        <p className="text-sm text-muted-foreground mb-2">{booking.services?.name || 'N/A'}</p>
-                        <div className="flex items-center gap-2">
-                          <Calendar className="h-4 w-4 text-muted-foreground" />
-                          <p className="text-xs text-muted-foreground">{new Date(booking.booking_date).toLocaleDateString('id-ID')}</p>
+
+                        {/* Kolom Status dan Harga */}
+                        <div className="w-full sm:w-auto flex flex-row sm:flex-col items-center sm:items-end justify-between gap-2">
+                          <div className="flex items-center sm:justify-end gap-2 flex-wrap">
+                            <Badge className={`${getStatusColor(booking.status)} border`}>{booking.status}</Badge>
+                            <Badge variant={booking.payments?.payment_status === 'paid' ? 'default' : 'destructive'}>{booking.payments?.payment_status === 'paid' ? 'Lunas' : 'Belum Lunas'}</Badge>
+                          </div>
+                          <p className="font-bold text-lg text-primary sm:mt-2 text-right whitespace-nowrap">{formatCurrency(booking.total_price)}</p>
                         </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-bold text-lg text-primary">{formatCurrency(booking.total_price)}</p>
                       </div>
                     </div>
                   )) : (

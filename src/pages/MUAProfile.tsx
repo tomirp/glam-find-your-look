@@ -225,12 +225,14 @@ const MUAProfile = () => {
               <DashboardTab bookings={bookings} services={services} />
             </TabsContent>
             
-            <TabsContent value="layanan">
+             <TabsContent value="layanan">
               <ServicesPortfolioTab 
                 muaProfile={muaProfile}
                 services={services}
                 onPortfolioUpload={handlePortfolioUpload}
                 onServiceAdded={fetchAllData}
+                // PERUBAHAN: Tambahkan prop ini
+                onProfileUpdate={fetchAllData} 
               />
             </TabsContent>
             
