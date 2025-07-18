@@ -6,7 +6,7 @@ import {
   DropdownMenuSeparator, // Penting: tambahkan import ini
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
-import { User, ChevronDown } from "lucide-react";
+import { User, ChevronDown, Activity as ActivityIcon } from "lucide-react"; // Impor ikon Activity
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -52,15 +52,12 @@ const Navbar = () => {
   return (
     <nav className="sticky top-0 z-50 bg-background border-b border-border shadow-sm">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-        {/* Logo */}
         <div className="flex items-center space-x-8">
           <h1 onClick={() => navigate('/')} className="text-2xl font-bold text-primary font-heading cursor-pointer">
             GlamFind
           </h1>
-          {/* Anda bisa menambahkan link navigasi lain di sini */}
         </div>
 
-        {/* User Menu */}
         <div className="flex items-center">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -74,16 +71,23 @@ const Navbar = () => {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
               {!user ? (
-                // Jika belum login
                 <DropdownMenuItem onClick={() => navigate("/auth")} className="cursor-pointer">
                   Masuk / Daftar
                 </DropdownMenuItem>
               ) : (
-                // Jika sudah login
                 <>
                   <DropdownMenuItem onClick={handleProfileClick} className="cursor-pointer">
                     Profil Saya
                   </DropdownMenuItem>
+
+                  {/* Tambahkan menu "Aktivitas" hanya untuk customer */}
+                  {role === 'customer' && (
+                    <DropdownMenuItem onClick={() => navigate("/aktivitas")} className="cursor-pointer">
+                      <ActivityIcon className="h-4 w-4 mr-2" />
+                      Aktivitas
+                    </DropdownMenuItem>
+                  )}
+
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-destructive focus:bg-destructive focus:text-destructive-foreground">
                     Keluar

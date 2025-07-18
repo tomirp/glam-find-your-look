@@ -18,6 +18,7 @@ import MUAOnboarding from "./pages/MUAOnboarding";
 import WaitingForPayment from "./pages/WaitingForPayment"; // Impor halaman baru
 import ProtectedRoute from "./components/ProtectedRoute";
 import CustomerProtectedRoute from "./components/CustomerProtectedRoute";
+import Activity from "./pages/Activity"; // PERUBAHAN: Impor halaman baru
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { refetchOnWindowFocus: false } },
@@ -40,6 +41,8 @@ const App = () => (
             </Route>
             <Route element={<CustomerProtectedRoute />}>
               <Route path="/customer/profile" element={<CustomerProfile />} />
+              
+              <Route path="/aktivitas" element={<Activity />} />
             </Route>
             <Route path="/mua/:id" element={<MUADetail />} />
             <Route path="/checkout" element={<Checkout />} />
