@@ -19,12 +19,15 @@ interface Conversation {
   }
 }
 
-const CustomerChatList = () => {
+// PERBAIKAN UTAMA: Mendefinisikan tipe untuk props yang diterima
+interface CustomerChatListProps {
+  onConversationSelect: (conversationId: string) => void;
+}
+
+const CustomerChatList = ({ onConversationSelect }: CustomerChatListProps) => {
   const { user } = useAuth();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
-  const isMobile = useIsMobile();
-  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchConversations = async () => {
@@ -49,14 +52,6 @@ const CustomerChatList = () => {
     fetchConversations();
   }, [user]);
 
-  const handleConversationClick = (conversationId: string) => {
-    if (isMobile) {
-      navigate(`/chat/${conversationId}`);
-    } else {
-      alert(`Buka popup chat untuk ID: ${conversationId}`);
-    }
-  };
-
   if (loading) {
     return <p>Memuat percakapan...</p>;
   }
@@ -73,7 +68,8 @@ const CustomerChatList = () => {
             <div 
               key={convo.id} 
               className="flex items-center gap-4 p-3 rounded-lg hover:bg-accent cursor-pointer transition-colors"
-              onClick={() => handleConversationClick(convo.id)}
+              // PERBAIKAN UTAMA: Menggunakan prop onConversationSelect yang sudah didefinisikan
+              onClick={() => onConversationSelect(convo.id)}
             >
               <Avatar>
                 <AvatarImage src={convo.profiles.avatar_url} />

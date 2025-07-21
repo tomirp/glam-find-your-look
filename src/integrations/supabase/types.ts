@@ -1,3 +1,6 @@
+Need to install the following packages:
+supabase@2.31.8
+Ok to proceed? (y) 
 export type Json =
   | string
   | number
@@ -475,6 +478,13 @@ export type Database = {
       cancel_booking: {
         Args: { p_booking_id: string }
         Returns: undefined
+      }
+      get_customer_conversations: {
+        Args: { customer_profile_id: string }
+        Returns: {
+          id: string
+          profiles: Json
+        }[]
       }
       get_mua_conversations: {
         Args: { mua_profile_id: string }
