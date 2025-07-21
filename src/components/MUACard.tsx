@@ -22,7 +22,16 @@ export interface MUAProfileForCard {
   cover_image_url: string | null;
 }
 
-const MUACard = ({ id, business_name, rating, total_reviews, location_city, price_range, isPopular = false, cover_image_url }: MUAProfileForCard) => {
+const MUACard = ({ 
+  id, 
+  business_name, 
+  rating, 
+  total_reviews, 
+  location_city, 
+  price_range,
+  isPopular = false,
+  cover_image_url 
+}: MUAProfileForCard) => {
   const { user, role } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -33,7 +42,6 @@ const MUACard = ({ id, business_name, rating, total_reviews, location_city, pric
   useEffect(() => {
     const checkFavoriteStatus = async () => {
       if (!user || role !== 'customer' || !id) return;
-
       const { data: profileData } = await supabase.from('profiles').select('id').eq('user_id', user.id).single();
       if (profileData) {
         setProfileId(profileData.id);
@@ -47,14 +55,12 @@ const MUACard = ({ id, business_name, rating, total_reviews, location_city, pric
   const handleFavoriteClick = async (event: React.MouseEvent) => {
     event.preventDefault(); 
     event.stopPropagation();
-
     if (!user || role !== 'customer') {
       toast({ title: "Login Diperlukan", description: "Anda harus masuk sebagai pelanggan untuk menambahkan favorit.", variant: "destructive" });
       navigate('/auth');
       return;
     }
     if (!profileId || !id) return;
-
     if (isFavorited) {
       const { error } = await supabase.from('favorites').delete().eq('customer_id', profileId).eq('mua_profile_id', id);
       if (!error) setIsFavorited(false);
@@ -62,12 +68,10 @@ const MUACard = ({ id, business_name, rating, total_reviews, location_city, pric
       const { error } = await supabase.from('favorites').insert({ customer_id: profileId, mua_profile_id: id });
       if (!error) {
         setIsFavorited(true);
-        // Memicu animasi saat berhasil memfavoritkan
         setShowLikeAnimation(true);
-        // Sembunyikan animasi setelah 1 detik (sesuai durasi animasi)
-        setTimeout(() => setShowLikeAnimation(false), 1000); 
+        setTimeout(() => setShowLikeAnimation(false), 1000);
       } else {
-        toast({ title: "Gagal", description: "Mungkin MUA ini sudah ada di daftar favorit Anda.", variant: "destructive" });
+        toast({ title: "Gagal", description: "Mungkin sudah ada di favorit.", variant: "destructive" });
       }
     }
   };
@@ -78,20 +82,16 @@ const MUACard = ({ id, business_name, rating, total_reviews, location_city, pric
 
   return (
     <>
-      {/* Elemen baru untuk animasi pop-up di tengah layar */}
       {showLikeAnimation && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/10 backdrop-blur-sm pointer-events-none">
           <Heart className="w-32 h-32 text-red-500 fill-red-500 animate-like-popup" />
         </div>
       )}
-
       <Card className="hover:shadow-lg transition-shadow cursor-pointer border-border group h-full flex flex-col">
         <CardContent className="p-0 flex flex-col flex-grow">
           <div className="relative aspect-square bg-gradient-to-br from-primary/20 to-secondary/30 rounded-t-lg overflow-hidden">
             {cover_image_url ? <img src={cover_image_url} alt={nameText} className="h-full w-full object-cover" /> : <div className="absolute inset-0 flex items-center justify-center"><div className="w-16 h-16 bg-primary/20 rounded-full flex items-center justify-center"><span className="text-xl font-bold text-primary">{nameText.charAt(0)}</span></div></div>}
             {isPopular && (<Badge className="absolute top-2 left-2 text-xs">Popular</Badge>)}
-            
-            {/* PERBAIKAN UTAMA: Menggunakan <div>, bukan <Button>, untuk menghilangkan blok kotak */}
             <div 
               className="absolute top-2 right-2 h-8 w-8 rounded-full bg-background/80 hover:bg-background flex items-center justify-center transition-colors" 
               onClick={handleFavoriteClick}
@@ -101,20 +101,23 @@ const MUACard = ({ id, business_name, rating, total_reviews, location_city, pric
               <Heart className={`w-4 h-4 transition-all ${isFavorited ? 'text-red-500 fill-red-500' : 'text-gray-400'}`} />
             </div>
           </div>
+          {/* PERUBAHAN UTAMA ADA DI SINI */}
           <div className="p-3 md:p-4 flex flex-col flex-grow">
-            <h3 className="font-semibold text-base md:text-lg text-foreground mb-1 font-heading truncate">{nameText}</h3>
-            <div className="flex flex-col items-start gap-1 mb-3">
+            <h3 className="font-semibold text-sm md:text-lg text-foreground mb-1 font-heading truncate">{nameText}</h3>
+            
+            <div className="flex flex-col items-start gap-1 mb-2">
               <div className="flex items-center space-x-1 text-xs text-muted-foreground">
                 <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
                 <span className="font-medium text-foreground">{rating?.toFixed(1) || 'Baru'}</span>
-                <span>({total_reviews || 0} ulasan)</span>
+                <span>({total_reviews || 0})</span>
               </div>
               <div className="flex items-center space-x-1 text-xs text-muted-foreground truncate">
                 <MapPin className="w-3 h-3" />
                 <span className="truncate">{location_city}</span>
               </div>
             </div>
-            <div className="flex items-center justify-between mt-auto pt-2">
+            
+            <div className="flex items-center justify-between mt-auto pt-1">
               <div className="relative w-2/3 overflow-hidden [mask-image:linear-gradient(to_right,black_80%,transparent)]">
                 <div className="text-sm md:text-lg font-bold text-primary whitespace-nowrap animate-marquee-infinite">
                   {duplicatedPriceText}

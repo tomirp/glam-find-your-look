@@ -81,6 +81,24 @@ export type Database = {
           },
         ]
       }
+      conversations: {
+        Row: {
+          created_at: string
+          id: string
+          participant_ids: string[]
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          participant_ids: string[]
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          participant_ids?: string[]
+        }
+        Relationships: []
+      }
       favorites: {
         Row: {
           created_at: string
@@ -113,6 +131,45 @@ export type Database = {
             columns: ["mua_profile_id"]
             isOneToOne: false
             referencedRelation: "mua_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      messages: {
+        Row: {
+          content: string
+          conversation_id: string
+          created_at: string
+          id: number
+          sender_id: string
+        }
+        Insert: {
+          content: string
+          conversation_id: string
+          created_at?: string
+          id?: number
+          sender_id: string
+        }
+        Update: {
+          content?: string
+          conversation_id?: string
+          created_at?: string
+          id?: number
+          sender_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -418,6 +475,13 @@ export type Database = {
       cancel_booking: {
         Args: { p_booking_id: string }
         Returns: undefined
+      }
+      get_mua_conversations: {
+        Args: { mua_profile_id: string }
+        Returns: {
+          id: string
+          profiles: Json
+        }[]
       }
     }
     Enums: {

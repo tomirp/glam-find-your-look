@@ -1,27 +1,31 @@
+// src/components/ProtectedRoute.tsx
+
 import { useAuth } from "@/contexts/AuthContext";
 import { Navigate, Outlet } from "react-router-dom";
 
-const ProtectedRoute = () => {
+// PERUBAHAN: Komponen sekarang menerima prop 'allowedRoles'
+interface ProtectedRouteProps {
+  allowedRoles: Array<'mua' | 'customer'>;
+}
+
+const ProtectedRoute = ({ allowedRoles }: ProtectedRouteProps) => {
   const { role, loading } = useAuth();
 
-  // Jika data autentikasi masih dimuat, tampilkan pesan loading
-  // untuk mencegah redirect yang tidak perlu.
   if (loading) {
     return (
         <div className="min-h-screen flex items-center justify-center">
-            <div>Loading...</div>
+            <div>Memuat...</div>
         </div>
     );
   }
 
-  // Jika loading selesai dan pengguna BUKAN seorang 'mua',
-  // arahkan mereka kembali ke halaman login.
-  if (role !== 'mua') {
+  // PERUBAHAN: Logika sekarang memeriksa apakah peran pengguna ada di dalam 'allowedRoles'
+  if (!role || !allowedRoles.includes(role)) {
+    // Jika tidak diizinkan, arahkan ke halaman login
     return <Navigate to="/auth" replace />;
   }
 
-  // Jika semua kondisi terpenuhi (loading selesai dan role adalah 'mua'),
-  // izinkan akses ke halaman dashboard.
+  // Jika diizinkan, tampilkan halamannya
   return <Outlet />;
 };
 

@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -198,30 +199,36 @@ const CustomerProfile = () => {
 
       <div className="container mx-auto max-w-5xl px-4 py-8">
         <Card className="mb-8 overflow-hidden border-0 shadow-xl bg-gradient-to-r from-primary to-secondary">
-          <CardContent className="p-8 text-primary-foreground">
-            <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
-              <Avatar className="h-24 w-24 border-4 border-primary-foreground shadow-xl">
+          {/* PERUBAHAN: Penyesuaian padding dan ukuran elemen untuk mobile */}
+          <CardContent className="p-4 sm:p-8 text-primary-foreground">
+            <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
+              {/* Ukuran Avatar dikecilkan di mobile */}
+              <Avatar className="h-20 w-20 sm:h-24 sm:w-24 border-4 border-primary-foreground shadow-xl">
                 <AvatarImage src={profile.avatar_url || ''} />
-                <AvatarFallback className="bg-primary-foreground text-primary text-2xl font-bold font-heading">
-                  {profile.full_name?.charAt(0) || <User className="h-10 w-10" />}
+                <AvatarFallback className="bg-primary-foreground text-primary text-xl sm:text-2xl font-bold font-heading">
+                  {profile.full_name?.charAt(0) || <User className="h-8 w-8 sm:h-10 sm:w-10" />}
                 </AvatarFallback>
               </Avatar>
-              <div className="flex-1 space-y-3">
-                <h1 className="text-4xl font-bold font-heading tracking-wide">{profile.full_name}</h1>
-                <p className="text-primary-foreground/90 text-lg font-medium">{user.email}</p>
-                <div className="flex flex-wrap gap-3 text-primary-foreground/90">
-                  {profile.phone && ( <div className="flex items-center gap-2 bg-primary-foreground/10 px-3 py-1 rounded-full"> <Phone className="h-4 w-4" /> <span className="text-sm font-medium">{profile.phone}</span> </div> )}
-                  {profile.address && ( <div className="flex items-center gap-2 bg-primary-foreground/10 px-3 py-1 rounded-full"> <MapPin className="h-4 w-4" /> <span className="text-sm font-medium">{profile.address}</span> </div> )}
+              
+              <div className="flex-1 space-y-2 text-center sm:text-left">
+                {/* Ukuran font dikecilkan di mobile */}
+                <h1 className="text-2xl sm:text-4xl font-bold font-heading tracking-wide">{profile.full_name}</h1>
+                <p className="text-primary-foreground/90 text-base sm:text-lg font-medium">{user.email}</p>
+                <div className="flex flex-wrap gap-2 justify-center sm:justify-start text-primary-foreground/90">
+                  {profile.phone && ( <div className="flex items-center gap-2 bg-primary-foreground/10 px-3 py-1 rounded-full"> <Phone className="h-3 w-3 sm:h-4 sm:w-4" /> <span className="text-xs sm:text-sm font-medium">{profile.phone}</span> </div> )}
+                  {profile.address && ( <div className="flex items-center gap-2 bg-primary-foreground/10 px-3 py-1 rounded-full"> <MapPin className="h-3 w-3 sm:h-4 sm:w-4" /> <span className="text-xs sm:text-sm font-medium">{profile.address}</span> </div> )}
                 </div>
               </div>
-              <div className="flex flex-col md:flex-row gap-4">
-                <div className="text-center bg-primary-foreground/20 rounded-xl p-6 backdrop-blur-sm border border-primary-foreground/10">
-                  <div className="text-3xl font-bold font-heading">{bookings.length}</div>
-                  <div className="text-sm text-primary-foreground/80 mt-1">Total Booking</div>
+
+              <div className="flex flex-row gap-4 mt-4 sm:mt-0">
+                {/* Ukuran box statistik dikecilkan di mobile */}
+                <div className="text-center bg-primary-foreground/20 rounded-xl p-3 sm:p-6 backdrop-blur-sm border border-primary-foreground/10">
+                  <div className="text-2xl sm:text-3xl font-bold font-heading">{bookings.length}</div>
+                  <div className="text-xs sm:text-sm text-primary-foreground/80 mt-1">Total Booking</div>
                 </div>
-                <div className="text-center bg-primary-foreground/20 rounded-xl p-6 backdrop-blur-sm border border-primary-foreground/10">
-                  <div className="text-3xl font-bold font-heading">{reviews.length}</div>
-                  <div className="text-sm text-primary-foreground/80 mt-1">Ulasan Diberikan</div>
+                <div className="text-center bg-primary-foreground/20 rounded-xl p-3 sm:p-6 backdrop-blur-sm border border-primary-foreground/10">
+                  <div className="text-2xl sm:text-3xl font-bold font-heading">{reviews.length}</div>
+                  <div className="text-xs sm:text-sm text-primary-foreground/80 mt-1">Ulasan</div>
                 </div>
               </div>
             </div>
@@ -229,7 +236,6 @@ const CustomerProfile = () => {
         </Card>
 
         <Tabs defaultValue="riwayat" className="space-y-6">
-          {/* PERUBAHAN: Mengganti Carousel dengan div overflow yang lebih stabil */}
           <div className="relative scroll-shadows bg-card rounded-xl shadow-sm border border-border p-2">
             <div className="overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                 <TabsList className="bg-transparent p-1 inline-flex">

@@ -5,7 +5,9 @@ import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { useIsMobile } from "@/hooks/use-mobile";
 
+import Navbar from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,6 +15,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Star, MapPin, Heart, Palette, Clock, MessageSquare, ArrowLeft } from "lucide-react";
 import BookingModal from "@/components/BookingModal";
 import { Skeleton } from "@/components/ui/skeleton";
+import ChatPopup from "@/components/ChatPopup";
 
 // Tipe Data
 interface Service {
@@ -67,6 +70,11 @@ const MUADetail = () => {
   const [isFavorited, setIsFavorited] = useState(false);
   const [profileId, setProfileId] = useState<string | null>(null);
   const [showLikeAnimation, setShowLikeAnimation] = useState(false);
+
+  const isMobile = useIsMobile();
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+
 
   useEffect(() => {
     const fetchMUADetail = async () => {
@@ -140,6 +148,45 @@ const MUADetail = () => {
       }
     }
   };
+
+  const handleInitiateChat = async () => {
+    if (!user || !mua?.profiles?.id) {
+      toast({ title: "Login Diperlukan", description: "Anda harus login untuk memulai chat.", variant: "destructive" });
+      navigate('/auth');
+      return;
+    }
+
+    const { data: currentUserProfile } = await supabase.from('profiles').select('id').eq('user_id', user.id).single();
+    if (!currentUserProfile) return;
+
+    const { data: existingConversation } = await supabase
+        .from('conversations')
+        .select('id')
+        .contains('participant_ids', [currentUserProfile.id, mua.profiles.id])
+        .single();
+
+    let conversationId = existingConversation?.id;
+
+    if (!conversationId) {
+        const { data: newConversation, error } = await supabase
+            .from('conversations')
+            .insert({ participant_ids: [currentUserProfile.id, mua.profiles.id] })
+            .select('id')
+            .single();
+        if (error || !newConversation) {
+            toast({ title: "Gagal memulai chat", description: error?.message, variant: "destructive"});
+            return;
+        }
+        conversationId = newConversation.id;
+    }
+
+    if (isMobile) {
+        navigate(`/chat/${conversationId}`);
+    } else {
+        setActiveConversationId(conversationId);
+        setIsChatOpen(true);
+    }
+  };
   
   const formatCurrency = (amount: number) => new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(amount);
 
@@ -184,7 +231,6 @@ const MUADetail = () => {
       )}
       <div className="min-h-screen bg-background">
         
-        {/* Header Tetap Sticky di Atas */}
         <div className="sticky top-0 z-20 bg-background/80 backdrop-blur-sm border-b">
           <div className="container mx-auto px-4 flex items-center justify-between h-16">
             <Button variant="ghost" onClick={() => navigate(-1)}>
@@ -202,7 +248,6 @@ const MUADetail = () => {
           </div>
         </div>
 
-        {/* PERBAIKAN UTAMA: Semua konten utama sekarang berada di dalam satu div wrapper */}
         <div className="relative">
           <div className="absolute h-64 md:h-96 w-full">
             <img src={safeMua.cover_image_url} alt={safeMua.business_name} className="h-full w-full object-cover" />
@@ -224,7 +269,7 @@ const MUADetail = () => {
                 </div>
               </div>
               <div className="flex gap-2 w-full md:w-auto">
-                <Button variant="outline" size="lg" className="flex-1"><MessageSquare className="w-4 h-4 mr-2" />Chat</Button>
+                <Button variant="outline" size="lg" className="flex-1" onClick={handleInitiateChat}><MessageSquare className="w-4 h-4 mr-2" />Chat</Button>
                 <Button onClick={() => setIsModalOpen(true)} size="lg" className="flex-1">Pesan Sekarang</Button>
               </div>
             </div>
@@ -285,6 +330,13 @@ const MUADetail = () => {
         </div>
       </div>
       
+        {!isMobile && isChatOpen && activeConversationId && (
+        <ChatPopup 
+            conversationId={activeConversationId} 
+            onClose={() => setIsChatOpen(false)} 
+        />
+      )}
+
       {isModalOpen && mua && (
         <BookingModal 
           isOpen={isModalOpen}

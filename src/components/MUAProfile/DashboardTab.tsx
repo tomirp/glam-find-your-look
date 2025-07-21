@@ -20,11 +20,9 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-
 interface DashboardTabProps {
   bookings: Booking[];
   services: Service[];
-  // PERUBAHAN: Tambahkan prop untuk me-refresh data setelah pembatalan
   onBookingUpdate: () => void;
 }
 
@@ -34,8 +32,7 @@ export const DashboardTab = ({ bookings, services, onBookingUpdate }: DashboardT
   const monthlyRevenue = bookings
     .filter(b => new Date(b.booking_date).getMonth() === currentMonth && b.status === 'completed')
     .reduce((sum, b) => sum + b.total_price, 0);
-
-     // PERUBAHAN: Tambahkan toast dan fungsi pembatalan
+    
   const { toast } = useToast();
 
   const handleCancelBooking = async (bookingId: string) => {
@@ -44,9 +41,7 @@ export const DashboardTab = ({ bookings, services, onBookingUpdate }: DashboardT
       const { error } = await supabase.rpc('cancel_booking', {
         p_booking_id: bookingId
       });
-
       if (error) throw error;
-
       toast({ title: "Berhasil", description: "Pesanan telah dibatalkan." });
       onBookingUpdate();
     } catch (error: any) {
@@ -56,7 +51,6 @@ export const DashboardTab = ({ bookings, services, onBookingUpdate }: DashboardT
 
   return (
     <div className="space-y-6">
-      {/* Card Statistik Pendapatan & Pesanan */}
       <div className="grid gap-4 sm:grid-cols-3">
         <Card className="border-0 shadow-lg">
           <CardContent className="p-4 flex items-center justify-between">
@@ -89,7 +83,6 @@ export const DashboardTab = ({ bookings, services, onBookingUpdate }: DashboardT
         </Card>
       </div>
       
-      {/* Card Pesanan Terbaru */}
       <Card className="border-0 shadow-lg">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -99,51 +92,47 @@ export const DashboardTab = ({ bookings, services, onBookingUpdate }: DashboardT
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {bookings.filter(b => b.status !== 'rejected' && b.status !== 'cancelled').slice(0, 5).map(booking => ( // Filter pesanan yang dibatalkan
+            {bookings.filter(b => b.status !== 'rejected' && b.status !== 'cancelled').slice(0, 5).map(booking => (
+              // PERUBAHAN: Layout kartu pesanan diubah menggunakan Flexbox
               <div key={booking.id} className="p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                <div className="flex justify-between items-start gap-3">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                     <div className="flex-grow min-w-0">
-                        <h4 className="font-medium truncate">{booking.profiles?.full_name}</h4>
+                        <h4 className="font-semibold text-base truncate">{booking.profiles?.full_name}</h4>
                         <p className="text-sm text-gray-600 truncate">{booking.services?.name}</p>
-                        <div className="flex flex-wrap items-center gap-2 mt-2">
+                        <p className="text-xs text-gray-500 mt-1">
+                            {new Date(booking.booking_date).toLocaleDateString('id-ID', {day: '2-digit', month: 'short', year: 'numeric'})}
+                        </p>
+                    </div>
+                    <div className="w-full sm:w-auto flex flex-row sm:flex-col items-center sm:items-end justify-between gap-2 mt-2 sm:mt-0">
+                        <div className="flex items-center gap-2 flex-wrap">
                            <Badge className={`${getStatusColor(booking.status)} border-0 text-xs font-medium`}>{booking.status}</Badge>
                            <Badge variant={booking.payments?.payment_status === 'paid' ? 'default' : 'destructive'} className="text-xs font-medium">
                               {booking.payments?.payment_status === 'paid' ? 'Lunas' : 'Belum Bayar'}
                            </Badge>
                         </div>
-                    </div>
-                    <div className="flex-shrink-0 text-right flex flex-col items-end gap-2">
-                        <p className="font-semibold text-purple-600 whitespace-nowrap">{formatCurrency(booking.total_price)}</p>
-                        {/* PERUBAHAN: Tombol Batal akan muncul jika statusnya sesuai */}
-                          {(booking.status === 'pending' || booking.status === 'accepted') && (
-                           // PERUBAHAN: Tombol "Batalkan" sekarang dibungkus dengan AlertDialog
-                           <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button
-                                  variant="destructive"
-                                  size="sm"
-                                  className="text-xs h-7 px-2"
-                                >
-                                  <XCircle className="h-3 w-3 mr-1" />
-                                  Batalkan
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Apakah Anda Yakin?</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Aksi ini akan membatalkan pesanan dari pelanggan. Aksi ini tidak dapat diurungkan.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Tidak, Kembali</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => handleCancelBooking(booking.id)}>
-                                    Ya, Batalkan Pesanan
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                        )}
+                         <div className="flex items-center gap-2">
+                            <p className="font-semibold text-purple-600 whitespace-nowrap">{formatCurrency(booking.total_price)}</p>
+                            {(booking.status === 'pending' || booking.status === 'accepted') && (
+                               <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button variant="destructive" size="sm" className="text-xs h-6 px-2">
+                                      <XCircle className="h-3 w-3 mr-1" />
+                                      Batal
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Apakah Anda Yakin?</AlertDialogTitle>
+                                      <AlertDialogDescription>Aksi ini akan membatalkan pesanan. Aksi ini tidak dapat diurungkan.</AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Kembali</AlertDialogCancel>
+                                      <AlertDialogAction onClick={() => handleCancelBooking(booking.id)}>Ya, Batalkan</AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                            )}
+                        </div>
                     </div>
                 </div>
               </div>
