@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ArrowLeft } from 'lucide-react';
 import ChatInput from '@/components/ChatInput';
 import ChatMessage from '@/components/ChatMessage';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface Message {
   id: number;
@@ -59,26 +60,50 @@ const ChatPage = () => {
   }, [conversationId]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
   }, [messages]);
 
   const handleSendMessage = async (content: string) => {
     if (!profileId || !conversationId) return;
-    // PERBAIKAN: Menggunakan snake_case `conversation_id` sesuai skema database
     await supabase.from('messages').insert({ content, conversation_id: conversationId, sender_id: profileId });
   };
 
-  if (loading) return <div>Memuat percakapan...</div>;
+  if (loading) {
+      return (
+        <div className="flex flex-col h-screen bg-background">
+            <header className="flex items-center p-4 border-b">
+                <Skeleton className="h-6 w-6 rounded-full" />
+                <Skeleton className="h-6 w-24 ml-4" />
+            </header>
+            <main className="flex-1 p-4 space-y-4">
+                <Skeleton className="h-10 w-3/5 rounded-lg" />
+                <div className="flex justify-end">
+                    <Skeleton className="h-12 w-2/5 rounded-lg" />
+                </div>
+                <Skeleton className="h-8 w-1/2 rounded-lg" />
+            </main>
+            <div className="p-2 border-t">
+                <Skeleton className="h-10 w-full rounded-lg" />
+            </div>
+        </div>
+      );
+  }
 
   return (
-    <div className="flex flex-col h-screen bg-background">
-      <header className="flex items-center p-4 border-b sticky top-0 bg-background/80 backdrop-blur-sm z-10">
+    // PERBAIKAN UTAMA: Struktur layout baru
+    <div className="relative h-screen bg-background">
+      {/* Header diposisikan fixed di atas */}
+      <header className="fixed top-0 left-0 right-0 flex items-center p-4 border-b bg-background/80 backdrop-blur-sm z-10 h-16">
         <button onClick={() => navigate(-1)} className="p-2 -ml-2">
           <ArrowLeft className="h-6 w-6" />
         </button>
         <h1 className="text-lg font-semibold ml-4">Chat</h1>
       </header>
-      <main className="flex-1 overflow-y-auto p-4 space-y-4">
+
+      {/* Area Pesan diberi padding atas & bawah agar tidak tertutup header/input */}
+      <main className="overflow-y-auto h-full pt-20 pb-16 px-4 space-y-4">
         {messages.map((msg) => (
           <ChatMessage
             key={msg.id}
@@ -89,7 +114,11 @@ const ChatPage = () => {
         ))}
         <div ref={messagesEndRef} />
       </main>
-      <ChatInput onSendMessage={handleSendMessage} />
+      
+      {/* Input diposisikan fixed di bawah */}
+      <div className="fixed bottom-0 left-0 right-0 bg-background z-10">
+        <ChatInput onSendMessage={handleSendMessage} />
+      </div>
     </div>
   );
 };
