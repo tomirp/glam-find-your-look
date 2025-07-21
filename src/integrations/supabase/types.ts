@@ -81,6 +81,42 @@ export type Database = {
           },
         ]
       }
+      favorites: {
+        Row: {
+          created_at: string
+          customer_id: string
+          id: number
+          mua_profile_id: string
+        }
+        Insert: {
+          created_at?: string
+          customer_id: string
+          id?: number
+          mua_profile_id: string
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string
+          id?: number
+          mua_profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "favorites_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "favorites_mua_profile_id_fkey"
+            columns: ["mua_profile_id"]
+            isOneToOne: false
+            referencedRelation: "mua_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       mua_profiles: {
         Row: {
           bank_account_name: string | null

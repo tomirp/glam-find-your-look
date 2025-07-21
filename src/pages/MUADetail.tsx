@@ -2,286 +2,302 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
-import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
-import { ArrowLeft, Star, MapPin, Heart, Calendar } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Star, MapPin, Heart, Palette, Clock, MessageSquare, ArrowLeft } from "lucide-react";
 import BookingModal from "@/components/BookingModal";
-import { supabase } from "@/integrations/supabase/client";
-import type { MUAProfile } from "@/components/MUAProfile/types"; 
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+import { Skeleton } from "@/components/ui/skeleton";
 
-
+// Tipe Data
 interface Service {
+  id: string;
+  name: string;
+  description: string;
+  price_min: number;
+  price_max: number | null;
+  duration_minutes: number | null;
+  image_url: string | null;
+}
+
+interface Review {
+  id: string;
+  rating: number;
+  review_text: string | null;
+  created_at: string;
+  profiles: {
+    full_name: string | null;
+    avatar_url: string | null;
+  } | null;
+}
+
+interface MUAProfile {
+  id: string;
+  business_name: string;
+  location_city: string;
+  specializations: string[] | null;
+  rating: number | null;
+  total_reviews: number | null;
+  cover_image_url: string;
+  profiles: {
     id: string;
-    name: string;
-    description: string | null;
-    price_min: number;
-    rating?: number;
-    image_url: string | null;
+    full_name: string | null;
+    avatar_url: string | null;
+    bio: string | null;
+  } | null;
 }
 
 const MUADetail = () => {
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { role } = useAuth();
-  const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
-
-  const [muaData, setMuaData] = useState<MUAProfile | null>(null);
+  const { toast } = useToast();
+  const { user, role } = useAuth();
+  
+  const [mua, setMua] = useState<MUAProfile | null>(null);
   const [services, setServices] = useState<Service[]>([]);
+  const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  const [isFavorited, setIsFavorited] = useState(false);
+  const [profileId, setProfileId] = useState<string | null>(null);
+  const [showLikeAnimation, setShowLikeAnimation] = useState(false);
 
   useEffect(() => {
-    const fetchMUADetails = async () => {
+    const fetchMUADetail = async () => {
       if (!id) return;
       setLoading(true);
+      try {
+        const { data: muaData, error: muaError } = await supabase
+          .from('mua_profiles')
+          .select(`*, profiles(id, full_name, avatar_url, bio)`)
+          .eq('id', id)
+          .single();
 
-      const { data: muaProfile, error: muaError } = await supabase
-        .from('mua_profiles')
-        .select('*')
-        .eq('id', id)
-        .single();
+        if (muaError || !muaData) {
+          toast({ title: "MUA Tidak Ditemukan", description: "Profil MUA yang Anda cari tidak ada atau telah dihapus.", variant: "destructive" });
+          navigate('/');
+          return;
+        }
+        setMua(muaData as MUAProfile);
 
-      if (muaError || !muaProfile) {
-        console.error("Error fetching MUA details:", muaError);
-        navigate('/404');
-        return;
+        const { data: servicesData, error: servicesError } = await supabase.from('services').select('*').eq('mua_profile_id', id);
+        if (servicesError) toast({ title: "Gagal Memuat Layanan", description: servicesError.message, variant: "destructive" });
+        else setServices(servicesData || []);
+
+        const { data: reviewsData, error: reviewsError } = await supabase.from('reviews').select(`*, profiles(full_name, avatar_url)`).eq('mua_profile_id', id).order('created_at', { ascending: false });
+        if (reviewsError) toast({ title: "Gagal Memuat Ulasan", description: reviewsError.message, variant: "destructive" });
+        else setReviews(reviewsData as Review[] || []);
+
+      } catch (error: any) {
+        toast({ title: "Terjadi Kesalahan", description: "Gagal memuat halaman detail MUA.", variant: "destructive" });
+        navigate('/');
+      } finally {
+        setLoading(false);
       }
-      setMuaData(muaProfile);
-
-      const { data: servicesData, error: servicesError } = await supabase
-        .from('services')
-        .select('*')
-        .eq('mua_profile_id', muaProfile.id)
-        .eq('is_active', true);
-
-      if (servicesError) {
-        console.error("Error fetching services:", servicesError);
-      } else {
-        setServices(servicesData || []);
-      }
-
-      setLoading(false);
     };
+    fetchMUADetail();
+  }, [id, navigate, toast]);
 
-    fetchMUADetails();
-  }, [id, navigate]);
+  useEffect(() => {
+    const checkFavoriteStatus = async () => {
+      if (!user || role !== 'customer' || !id) return;
+      const { data: profileData } = await supabase.from('profiles').select('id').eq('user_id', user.id).single();
+      if (profileData) {
+        setProfileId(profileData.id);
+        const { data } = await supabase.from('favorites').select('id').eq('customer_id', profileData.id).eq('mua_profile_id', id).single();
+        setIsFavorited(!!data);
+      }
+    };
+    if (mua) {
+      checkFavoriteStatus();
+    }
+  }, [user, id, role, mua]);
 
- if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">Memuat detail MUA...</div>;
-  }
-
-  if (!muaData) {
-    return <div className="min-h-screen flex items-center justify-center">MUA tidak ditemukan.</div>;
-  }
-
-  const legacyMuaDataForModal = {
-    id: muaData.id,
-    name: muaData.business_name || '',
-    location: muaData.location_city || '',
-    styles: services.map(s => ({
-        id: s.id,
-        name: s.name,
-        price: `Rp ${s.price_min.toLocaleString('id-ID')}`
-    }))
+  const handleFavoriteClick = async () => {
+    if (!user || role !== 'customer') {
+      toast({ title: "Login Diperlukan", description: "Anda harus masuk sebagai pelanggan untuk menambahkan favorit.", variant: "destructive" });
+      navigate('/auth');
+      return;
+    }
+    if (!profileId || !id) return;
+    if (isFavorited) {
+      const { error } = await supabase.from('favorites').delete().eq('customer_id', profileId).eq('mua_profile_id', id);
+      if (!error) setIsFavorited(false);
+    } else {
+      const { error } = await supabase.from('favorites').insert({ customer_id: profileId, mua_profile_id: id });
+      if (!error) {
+        setIsFavorited(true);
+        setShowLikeAnimation(true);
+        setTimeout(() => setShowLikeAnimation(false), 1000);
+      } else {
+        toast({ title: "Gagal", description: "Mungkin sudah ada di favorit.", variant: "destructive" });
+      }
+    }
   };
   
-  const renderBookingButton = () => {
-    if (role === 'mua') {
-      return (
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button
-              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
-              size="lg"
-            >
-              <Calendar className="w-4 h-4 mr-2" />
-              Pesan Sekarang
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Tidak Bisa Memesan</AlertDialogTitle>
-              <AlertDialogDescription>
-                Anda tidak dapat memesan layanan Anda sendiri. Silakan masuk sebagai pelanggan untuk melanjutkan.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogAction>Mengerti</AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      );
-    }
+  const formatCurrency = (amount: number) => new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(amount);
 
+  if (loading) {
     return (
-      <Button 
-        onClick={() => setIsBookingModalOpen(true)}
-        className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
-        size="lg"
-      >
-        <Calendar className="w-4 h-4 mr-2" />
-        Pesan Sekarang
-      </Button>
+        <div className="min-h-screen bg-background">
+            <div className="container mx-auto px-4 py-4 border-b h-16 flex items-center">
+                <Skeleton className="h-10 w-24" />
+            </div>
+            <Skeleton className="h-64 md:h-96 w-full" />
+            <div className="container mx-auto px-4 -mt-24 pb-16">
+                <div className="flex flex-col md:flex-row items-end gap-6 mb-8">
+                    <Skeleton className="h-40 w-40 rounded-full border-4 border-background" />
+                    <div className="flex-1 space-y-2">
+                        <Skeleton className="h-10 w-3/4" />
+                        <Skeleton className="h-6 w-1/2" />
+                    </div>
+                </div>
+            </div>
+        </div>
     );
+  }
+
+  if (!mua) {
+    return null;
+  }
+
+  const safeMua = {
+    ...mua,
+    rating: mua.rating ?? 0,
+    total_reviews: mua.total_reviews ?? 0,
+    specializations: mua.specializations ?? [],
+    profiles: mua.profiles ?? { id: '', full_name: 'Nama MUA', avatar_url: '', bio: 'Bio tidak tersedia.' }
   };
 
-
   return (
-    <div className="min-h-screen bg-background">
-      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Button 
-            variant="ghost" 
-            onClick={() => navigate(-1)}
-            className="flex items-center space-x-2"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            <span>Kembali</span>
-          </Button>
-          
-          <Button variant="ghost" size="icon">
-            <Heart className="w-5 h-5" />
-          </Button>
+    <>
+      {showLikeAnimation && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/10 backdrop-blur-sm pointer-events-none">
+          <Heart className="w-32 h-32 text-red-500 fill-red-500 animate-like-popup" />
         </div>
-      </div>
-
-      <div className="container mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div className="space-y-6">
-            <Carousel className="w-full">
-              <CarouselContent>
-                {(muaData.portfolio_images && muaData.portfolio_images.length > 0) ? muaData.portfolio_images.map((image, index) => (
-                  <CarouselItem key={index}>
-                    <div className="aspect-square bg-gradient-to-br from-primary/20 to-secondary/30 rounded-lg overflow-hidden">
-                      <img 
-                        src={image} 
-                        alt={`Portfolio ${index + 1}`}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                  </CarouselItem>
-                )) : (
-                    <CarouselItem>
-                        <div className="aspect-square bg-gradient-to-br from-primary/20 to-secondary/30 rounded-lg overflow-hidden flex items-center justify-center">
-                            <p className="text-muted-foreground">Tidak ada foto portfolio</p>
-                        </div>
-                    </CarouselItem>
-                )}
-              </CarouselContent>
-              <CarouselPrevious />
-              <CarouselNext />
-            </Carousel>
-          </div>
-
-          <div className="space-y-6">
-            <div>
-              <h1 className="text-3xl font-bold text-foreground font-heading mb-2">
-                {muaData.business_name}
-              </h1>
-              
-              <div className="flex items-center space-x-4 mb-4">
-                <div className="flex items-center space-x-1">
-                  <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
-                  <span className="font-medium">{muaData.rating?.toFixed(1) || 'Baru'}</span>
-                  <span className="text-muted-foreground">({muaData.total_reviews || 0} ulasan)</span>
-                </div>
-                
-                <div className="flex items-center space-x-1">
-                  <MapPin className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-muted-foreground">{muaData.location_city}</span>
-                </div>
-              </div>
-
-              <p className="text-muted-foreground mb-6">
-                Professional makeup artist dengan pengalaman bertahun-tahun dalam berbagai acara.
-              </p>
-
-              <div className="mb-6">
-                <h3 className="text-lg font-semibold mb-3">Spesialisasi</h3>
-                <div className="flex flex-wrap gap-2">
-                  {muaData.specializations?.map((specialty, index) => (
-                    <Badge key={index} variant="secondary">
-                      {specialty}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-
-              {renderBookingButton()}
-
+      )}
+      <div className="min-h-screen bg-background">
+        
+        {/* Header Tetap Sticky di Atas */}
+        <div className="sticky top-0 z-20 bg-background/80 backdrop-blur-sm border-b">
+          <div className="container mx-auto px-4 flex items-center justify-between h-16">
+            <Button variant="ghost" onClick={() => navigate(-1)}>
+              <ArrowLeft className="h-5 w-5 mr-2" />
+              Kembali
+            </Button>
+            <div 
+              className="h-10 w-10 rounded-full hover:bg-accent flex items-center justify-center transition-colors cursor-pointer" 
+              onClick={handleFavoriteClick}
+              role="button"
+              aria-label="Toggle Favorite"
+            >
+              <Heart className={`w-5 h-5 transition-all ${isFavorited ? 'text-red-500 fill-red-500' : 'text-gray-500'}`} />
             </div>
           </div>
         </div>
 
-        <div className="mt-12">
-          <h2 className="text-2xl font-bold text-foreground font-heading mb-8">
-            Gaya Make-Up yang Ditawarkan
-          </h2>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {services.map((style) => (
-              <Card key={style.id} className="hover:shadow-lg transition-shadow cursor-pointer">
-                <CardContent className="p-0">
-                  <div className="aspect-square bg-gradient-to-br from-primary/20 to-secondary/30 rounded-t-lg overflow-hidden">
-                    <img 
-                      src={style.image_url || "/placeholder.svg"} 
-                      alt={style.name}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  
-                  <div className="p-4">
-                    <h3 className="font-semibold text-foreground mb-2">
-                      {style.name}
-                    </h3>
-                    
-                    <p className="text-sm text-muted-foreground mb-3">
-                      {style.description}
-                    </p>
-                    
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="font-bold text-primary">{`Rp ${style.price_min.toLocaleString('id-ID')}`}</span>
-                      <div className="flex items-center space-x-1">
-                        <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                        <span className="text-sm font-medium">{style.rating || 'Baru'}</span>
+        {/* PERBAIKAN UTAMA: Semua konten utama sekarang berada di dalam satu div wrapper */}
+        <div className="relative">
+          <div className="absolute h-64 md:h-96 w-full">
+            <img src={safeMua.cover_image_url} alt={safeMua.business_name} className="h-full w-full object-cover" />
+            <div className="absolute inset-0 bg-gradient-to-t from-background via-background/50 to-transparent" />
+          </div>
+
+          <div className="relative container mx-auto px-4 pt-48 md:pt-72 pb-16">
+            <div className="flex flex-col md:flex-row items-end gap-6 mb-8">
+              <Avatar className="h-40 w-40 border-4 border-background shadow-lg">
+                <AvatarImage src={safeMua.profiles.avatar_url || ''} />
+                <AvatarFallback className="text-4xl">{safeMua.business_name.charAt(0)}</AvatarFallback>
+              </Avatar>
+              <div className="flex-1">
+                <h1 className="text-4xl font-bold font-heading">{safeMua.business_name}</h1>
+                <p className="text-lg text-muted-foreground mt-1">{safeMua.profiles.full_name}</p>
+                <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-1.5"><Star className="w-4 h-4 text-yellow-400 fill-yellow-400" /><span>{safeMua.rating.toFixed(1)} ({safeMua.total_reviews} ulasan)</span></div>
+                  <div className="flex items-center gap-1.5"><MapPin className="w-4 h-4" /><span>{safeMua.location_city}</span></div>
+                </div>
+              </div>
+              <div className="flex gap-2 w-full md:w-auto">
+                <Button variant="outline" size="lg" className="flex-1"><MessageSquare className="w-4 h-4 mr-2" />Chat</Button>
+                <Button onClick={() => setIsModalOpen(true)} size="lg" className="flex-1">Pesan Sekarang</Button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <div className="lg:col-span-2 space-y-8">
+                <Card className="border-0 shadow-lg">
+                  <CardHeader><CardTitle className="flex items-center gap-2"><Palette className="w-5 h-5 text-primary" />Layanan Makeup</CardTitle></CardHeader>
+                  <CardContent className="space-y-4">
+                    {services.map(service => (
+                      <div key={service.id} className="flex gap-4 p-4 bg-accent/30 rounded-lg">
+                        <img src={service.image_url || ''} alt={service.name} className="w-24 h-24 object-cover rounded-md" />
+                        <div className="flex-1">
+                          <h4 className="font-semibold">{service.name}</h4>
+                          <p className="text-sm text-muted-foreground mt-1">{service.description}</p>
+                          <div className="flex items-center gap-4 mt-2 text-sm">
+                            <p className="font-bold text-primary">{formatCurrency(service.price_min)}{service.price_max ? ` - ${formatCurrency(service.price_max)}` : ''}</p>
+                            {service.duration_minutes && <div className="flex items-center gap-1 text-muted-foreground"><Clock className="w-3.5 h-3.5" /><span>{service.duration_minutes} min</span></div>}
+                          </div>
+                        </div>
                       </div>
+                    ))}
+                  </CardContent>
+                </Card>
+                <Card className="border-0 shadow-lg">
+                  <CardHeader><CardTitle className="flex items-center gap-2"><Star className="w-5 h-5 text-primary" />Ulasan Pelanggan ({reviews.length})</CardTitle></CardHeader>
+                  <CardContent className="space-y-6">
+                    {reviews.map(review => (
+                      <div key={review.id} className="flex gap-4">
+                        <Avatar><AvatarImage src={review.profiles?.avatar_url || ''} /><AvatarFallback>{review.profiles?.full_name?.charAt(0)}</AvatarFallback></Avatar>
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between">
+                            <h4 className="font-semibold">{review.profiles?.full_name}</h4>
+                            <div className="flex items-center gap-1 text-xs text-muted-foreground">{[...Array(5)].map((_, i) => (<Star key={i} className={`w-3.5 h-3.5 ${i < review.rating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}`} />))}</div>
+                          </div>
+                          <p className="text-xs text-muted-foreground">{new Date(review.created_at).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                          <p className="text-sm mt-2">{review.review_text}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              </div>
+              <div className="space-y-8">
+                <Card className="border-0 shadow-lg">
+                  <CardHeader><CardTitle>Tentang MUA</CardTitle></CardHeader>
+                  <CardContent className="text-muted-foreground text-sm space-y-4">
+                    <p>{safeMua.profiles.bio}</p>
+                    <div>
+                      <h4 className="font-semibold text-foreground mb-2">Spesialisasi</h4>
+                      <div className="flex flex-wrap gap-2">{safeMua.specializations.map(spec => (<Badge key={spec} variant="secondary">{spec}</Badge>))}</div>
                     </div>
-                    
-                    <Button 
-                      size="sm" 
-                      className="w-full"
-                      onClick={() => setIsBookingModalOpen(true)}
-                    >
-                      Pilih Gaya Ini
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
           </div>
         </div>
       </div>
-
-      {isBookingModalOpen && (
+      
+      {isModalOpen && mua && (
         <BookingModal 
-          isOpen={isBookingModalOpen}
-          onClose={() => setIsBookingModalOpen(false)}
-          muaData={legacyMuaDataForModal}
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          muaData={{ 
+            id: mua.id, 
+            name: mua.business_name, 
+            location: mua.location_city, 
+            styles: services.map(s => ({ id: s.id, name: s.name, price: formatCurrency(s.price_min) })) 
+          }}
         />
       )}
-    </div>
+    </>
   );
 };
 

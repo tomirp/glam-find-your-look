@@ -79,16 +79,23 @@ const config: Config = {
 					from: { height: 'var(--radix-accordion-content-height)' },
 					to: { height: '0' }
 				},
-				'marquee-infinite': {
+                'marquee-infinite': {
                     '0%': { transform: 'translateX(0%)' },
                     '100%': { transform: 'translateX(-50%)' },
+                },
+                 'like-popup': {
+                    '0%': { opacity: '0', transform: 'scale(0.5)' },
+                    '25%': { opacity: '1', transform: 'scale(1.2)' },
+                    '50%': { transform: 'scale(1)' },
+                    '80%': { opacity: '1', transform: 'scale(1.1)' },
+                    '100%': { opacity: '0', transform: 'scale(0)' },
                 },
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
 				'accordion-up': 'accordion-up 0.2s ease-out',
-				// PERUBAHAN: Animasi baru dengan durasi lebih panjang
 				'marquee-infinite': 'marquee-infinite 15s linear infinite',
+                'like-popup': 'like-popup 1s ease-in-out forwards',
 			}
 		}
 	},
