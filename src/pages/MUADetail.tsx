@@ -229,7 +229,7 @@ const MUADetail = () => {
           <Heart className="w-32 h-32 text-red-500 fill-red-500 animate-like-popup" />
         </div>
       )}
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-background pb-16 md:pb-0">
         
         <div className="sticky top-0 z-20 bg-background/80 backdrop-blur-sm border-b">
           <div className="container mx-auto px-4 flex items-center justify-between h-16">

@@ -1,6 +1,3 @@
-Need to install the following packages:
-supabase@2.31.8
-Ok to proceed? (y) 
 export type Json =
   | string
   | number
@@ -27,6 +24,7 @@ export type Database = {
           id: string
           mua_notes: string | null
           mua_profile_id: string
+          platform_fee: number
           service_id: string
           status: Database["public"]["Enums"]["booking_status"] | null
           total_price: number
@@ -41,6 +39,7 @@ export type Database = {
           id?: string
           mua_notes?: string | null
           mua_profile_id: string
+          platform_fee?: number
           service_id: string
           status?: Database["public"]["Enums"]["booking_status"] | null
           total_price: number
@@ -55,6 +54,7 @@ export type Database = {
           id?: string
           mua_notes?: string | null
           mua_profile_id?: string
+          platform_fee?: number
           service_id?: string
           status?: Database["public"]["Enums"]["booking_status"] | null
           total_price?: number
@@ -173,6 +173,41 @@ export type Database = {
             columns: ["sender_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mua_blocked_slots: {
+        Row: {
+          created_at: string
+          end_time: string
+          id: number
+          mua_profile_id: string
+          notes: string | null
+          start_time: string
+        }
+        Insert: {
+          created_at?: string
+          end_time: string
+          id?: number
+          mua_profile_id: string
+          notes?: string | null
+          start_time: string
+        }
+        Update: {
+          created_at?: string
+          end_time?: string
+          id?: number
+          mua_profile_id?: string
+          notes?: string | null
+          start_time?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mua_blocked_slots_mua_profile_id_fkey"
+            columns: ["mua_profile_id"]
+            isOneToOne: false
+            referencedRelation: "mua_profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -475,9 +510,35 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      advanced_mua_search: {
+        Args: {
+          p_query: string
+          p_min_price?: number
+          p_max_price?: number
+          p_min_rating?: number
+          p_specializations?: string[]
+          p_sort_by?: string
+        }
+        Returns: {
+          id: string
+          business_name: string
+          location_city: string
+          specializations: string[]
+          rating: number
+          total_reviews: number
+          cover_image_url: string
+          min_service_price: number
+        }[]
+      }
       cancel_booking: {
         Args: { p_booking_id: string }
         Returns: undefined
+      }
+      get_all_specializations: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          specialization: string
+        }[]
       }
       get_customer_conversations: {
         Args: { customer_profile_id: string }
@@ -492,6 +553,13 @@ export type Database = {
           id: string
           profiles: Json
         }[]
+      }
+      update_booking_status_by_mua: {
+        Args: {
+          p_booking_id: string
+          p_new_status: Database["public"]["Enums"]["booking_status"]
+        }
+        Returns: undefined
       }
     }
     Enums: {

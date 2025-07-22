@@ -118,7 +118,7 @@ const Activity = () => {
     };
 
     return (
-        <div className="min-h-screen bg-background">
+        <div className="min-h-screen bg-background pb-16 md:pb-0">
             <Navbar />
             <div className="container mx-auto px-4 py-8">
                 {/* PERUBAHAN: Tambahkan tombol Kembali ke Beranda di sini */}

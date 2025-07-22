@@ -201,7 +201,7 @@ const CustomerProfile = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-card to-secondary/20">
+    <div className="min-h-screen bg-gradient-to-br from-background via-card to-secondary/20 pb-16 md:pb-0">
       <div className="bg-card shadow-sm border-b border-border sticky top-0 z-20">
         <div className="container mx-auto max-w-5xl px-4 py-4">
           <div className="flex items-center justify-between">

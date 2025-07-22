@@ -21,6 +21,7 @@ import WaitingForPayment from "./pages/WaitingForPayment";
 import Activity from "./pages/Activity";
 import ChatPage from "./pages/ChatPage";
 import ProtectedRoute from "./components/ProtectedRoute"; // Pastikan impor ini benar
+import BottomNav from "./components/BottomNav"; // PERUBAHAN: Impor BottomNav
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { refetchOnWindowFocus: false } },
@@ -33,37 +34,38 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <Routes>
-            {/* Rute Publik */}
-            <Route path="/" element={<Index />} />
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/search" element={<SearchResults />} />
-            <Route path="/mua/:id" element={<MUADetail />} />
+              <Routes>
+                {/* Rute Publik */}
+                <Route path="/" element={<Index />} />
+                <Route path="/auth" element={<Auth />} />
+                <Route path="/search" element={<SearchResults />} />
+                <Route path="/mua/:id" element={<MUADetail />} />
 
-            {/* PERUBAHAN: Grup rute hanya untuk MUA */}
-            <Route element={<ProtectedRoute allowedRoles={['mua']} />}>
-              <Route path="/mua/profile" element={<MUAProfile />} />
-              <Route path="/mua/onboarding" element={<MUAOnboarding />} />
-            </Route>
+                {/* PERUBAHAN: Grup rute hanya untuk MUA */}
+                <Route element={<ProtectedRoute allowedRoles={['mua']} />}>
+                  <Route path="/mua/profile" element={<MUAProfile />} />
+                  <Route path="/mua/onboarding" element={<MUAOnboarding />} />
+                </Route>
 
-            {/* PERUBAHAN: Grup rute hanya untuk Customer */}
-            <Route element={<ProtectedRoute allowedRoles={['customer']} />}>
-              <Route path="/customer/profile" element={<CustomerProfile />} />
-              <Route path="/aktivitas" element={<Activity />} />
-              <Route path="/checkout" element={<Checkout />} />
-              <Route path="/payment" element={<Payment />} />
-              <Route path="/waiting-for-payment/:paymentId" element={<WaitingForPayment />} />
-              <Route path="/confirmation" element={<Confirmation />} />
-            </Route>
+                {/* PERUBAHAN: Grup rute hanya untuk Customer */}
+                <Route element={<ProtectedRoute allowedRoles={['customer']} />}>
+                  <Route path="/customer/profile" element={<CustomerProfile />} />
+                  <Route path="/aktivitas" element={<Activity />} />
+                  <Route path="/checkout" element={<Checkout />} />
+                  <Route path="/payment" element={<Payment />} />
+                  <Route path="/waiting-for-payment/:paymentId" element={<WaitingForPayment />} />
+                  <Route path="/confirmation" element={<Confirmation />} />
+                </Route>
 
-            {/* PERUBAHAN: Grup rute untuk MUA dan Customer */}
-            <Route element={<ProtectedRoute allowedRoles={['mua', 'customer']} />}>
-              <Route path="/chat/:conversationId" element={<ChatPage />} />
-            </Route>
-            
-            {/* Rute Not Found */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+                {/* PERUBAHAN: Grup rute untuk MUA dan Customer */}
+                <Route element={<ProtectedRoute allowedRoles={['mua', 'customer']} />}>
+                  <Route path="/chat/:conversationId" element={<ChatPage />} />
+                </Route>
+                
+                {/* Rute Not Found */}
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+          <BottomNav />
         </BrowserRouter>
       </TooltipProvider>
     </AuthProvider>
