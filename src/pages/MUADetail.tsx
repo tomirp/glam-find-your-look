@@ -40,6 +40,7 @@ interface Review {
 }
 
 interface MUAProfile {
+  vehicle_availability: "none" | "motorcycle" | "car";
   id: string;
   business_name: string;
   location_city: string;
@@ -344,7 +345,9 @@ const MUADetail = () => {
           muaData={{ 
             id: mua.id, 
             name: mua.business_name, 
-            location: mua.location_city, 
+            location: mua.location_city,
+            // **PERBAIKAN UTAMA: Pass the vehicle info to the modal/checkout flow**
+            vehicle: mua.vehicle_availability,
             styles: services.map(s => ({ id: s.id, name: s.name, price: formatCurrency(s.price_min) })) 
           }}
         />

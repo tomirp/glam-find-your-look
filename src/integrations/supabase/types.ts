@@ -236,6 +236,7 @@ export type Database = {
           total_bookings: number | null
           total_reviews: number | null
           updated_at: string
+          vehicle_availability: Database["public"]["Enums"]["vehicle_type"]
           whatsapp_number: string | null
         }
         Insert: {
@@ -261,6 +262,7 @@ export type Database = {
           total_bookings?: number | null
           total_reviews?: number | null
           updated_at?: string
+          vehicle_availability?: Database["public"]["Enums"]["vehicle_type"]
           whatsapp_number?: string | null
         }
         Update: {
@@ -286,6 +288,7 @@ export type Database = {
           total_bookings?: number | null
           total_reviews?: number | null
           updated_at?: string
+          vehicle_availability?: Database["public"]["Enums"]["vehicle_type"]
           whatsapp_number?: string | null
         }
         Relationships: [
@@ -297,6 +300,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      notifications: {
+        Row: {
+          created_at: string
+          id: number
+          is_read: boolean
+          link: string | null
+          message: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          is_read?: boolean
+          link?: string | null
+          message: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          is_read?: boolean
+          link?: string | null
+          message?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       payments: {
         Row: {
@@ -534,6 +564,17 @@ export type Database = {
         Args: { p_booking_id: string }
         Returns: undefined
       }
+      create_new_booking: {
+        Args: {
+          p_mua_profile_id: string
+          p_service_id: string
+          p_booking_date: string
+          p_booking_time: string
+          p_total_price: number
+          p_platform_fee: number
+        }
+        Returns: string
+      }
       get_all_specializations: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -571,6 +612,7 @@ export type Database = {
         | "cancelled"
       payment_status: "pending" | "paid" | "refunded" | "failed"
       user_type: "customer" | "mua"
+      vehicle_type: "none" | "motorcycle" | "car"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -707,6 +749,7 @@ export const Constants = {
       ],
       payment_status: ["pending", "paid", "refunded", "failed"],
       user_type: ["customer", "mua"],
+      vehicle_type: ["none", "motorcycle", "car"],
     },
   },
 } as const

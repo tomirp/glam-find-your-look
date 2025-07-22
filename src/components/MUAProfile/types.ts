@@ -9,6 +9,7 @@ export interface MUAProfile {
   total_bookings: number | null;
   is_available: boolean | null;
   portfolio_images: string[] | null;
+  vehicle_availability: 'none' | 'motorcycle' | 'car'; // Tambahkan baris ini
   profile_id: string;
   specializations: string[] | null;
   cover_image_url: string | null;
@@ -52,4 +53,5 @@ export interface EditForm {
   location_city: string;
   location_address: string;
   bio: string;
+  vehicle_availability?: 'none' | 'motorcycle' | 'car'; // Add this line
 }

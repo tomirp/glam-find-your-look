@@ -1,15 +1,15 @@
 // src/components/ProtectedRoute.tsx
 
 import { useAuth } from "@/contexts/AuthContext";
-import { Navigate, Outlet } from "react-router-dom";
+import { Navigate, Outlet, useLocation } from "react-router-dom";
 
-// PERUBAHAN: Komponen sekarang menerima prop 'allowedRoles'
 interface ProtectedRouteProps {
   allowedRoles: Array<'mua' | 'customer'>;
 }
 
 const ProtectedRoute = ({ allowedRoles }: ProtectedRouteProps) => {
-  const { role, loading } = useAuth();
+  const { role, loading, user } = useAuth();
+  const location = useLocation();
 
   if (loading) {
     return (
@@ -19,14 +19,18 @@ const ProtectedRoute = ({ allowedRoles }: ProtectedRouteProps) => {
     );
   }
 
-  // PERUBAHAN: Logika sekarang memeriksa apakah peran pengguna ada di dalam 'allowedRoles'
-  if (!role || !allowedRoles.includes(role)) {
-    // Jika tidak diizinkan, arahkan ke halaman login
-    return <Navigate to="/auth" replace />;
-  }
+  // PERBAIKAN UTAMA:
+  // 1. Cek apakah pengguna sudah login (user ada).
+  // 2. Cek apakah peran pengguna termasuk dalam peran yang diizinkan.
+  const isAuthorized = user && role && allowedRoles.includes(role);
 
-  // Jika diizinkan, tampilkan halamannya
-  return <Outlet />;
+  // Jika pengguna sudah diotorisasi, tampilkan halaman yang diminta.
+  // Jika tidak, arahkan ke halaman login sambil menyimpan halaman tujuan mereka.
+  return isAuthorized ? (
+    <Outlet />
+  ) : (
+    <Navigate to="/auth" state={{ from: location }} replace />
+  );
 };
 
 export default ProtectedRoute;

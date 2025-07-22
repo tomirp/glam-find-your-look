@@ -1,157 +1,152 @@
+// src/pages/Payment.tsx
+
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+
+import Navbar from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, CreditCard, Landmark, QrCode, Wallet } from "lucide-react";
-import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ArrowLeft, CreditCard, Lock } from "lucide-react";
 
 const Payment = () => {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const { orderData } = location.state || {};
-  const { user, loading: authLoading, setLoginRedirect } = useAuth();
-  const { toast } = useToast();
-  
-  const [selectedPayment, setSelectedPayment] = useState("bank_transfer");
-  const [loading, setLoading] = useState(false);
-  const [showAuthAlert, setShowAuthAlert] = useState(false);
+    const location = useLocation();
+    const navigate = useNavigate();
+    const { toast } = useToast();
+    const { user } = useAuth();
+    const [bookingData, setBookingData] = useState<any>(null);
+    const [paymentMethod, setPaymentMethod] = useState("credit_card");
+    const [isProcessing, setIsProcessing] = useState(false);
 
-  useEffect(() => {
-    if (!authLoading && !user) {
-      setLoginRedirect(location);
-      setShowAuthAlert(true);
+    useEffect(() => {
+        if (location.state && location.state.bookingData) {
+            setBookingData(location.state.bookingData);
+        } else {
+            toast({ title: "Error", description: "Data pemesanan tidak ditemukan.", variant: "destructive" });
+            navigate('/');
+        }
+    }, [location, navigate, toast]);
+
+    const handlePayment = async () => {
+        if (!user || !bookingData) {
+            toast({ title: "Error", description: "Sesi Anda berakhir, silakan login kembali.", variant: "destructive" });
+            navigate('/auth');
+            return;
+        }
+
+        setIsProcessing(true);
+        toast({ description: "Memproses pesanan Anda..." });
+
+        try {
+            // PERBAIKAN UTAMA: Panggil fungsi RPC `create_new_booking`
+            const { data: newBookingId, error } = await supabase
+                .rpc('create_new_booking', {
+                    p_mua_profile_id: bookingData.muaId,
+                    p_service_id: bookingData.serviceId,
+                    p_booking_date: new Date(bookingData.date).toISOString(),
+                    p_booking_time: bookingData.time,
+                    p_total_price: bookingData.totalPrice,
+                    p_platform_fee: 5000 // Contoh biaya platform
+                });
+
+            if (error) {
+                // Jika ada error dari fungsi (misalnya 'Customer profile not found'), tampilkan
+                throw error;
+            }
+            
+            toast({ title: "Berhasil!", description: "Pembayaran berhasil dan pesanan Anda telah dibuat." });
+            navigate('/confirmation', { state: { bookingId: newBookingId } });
+
+        } catch (error: any) {
+            console.error("Payment process error:", error);
+            toast({
+                title: "Gagal membuat Pesanan",
+                description: error.message,
+                variant: "destructive",
+            });
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+    
+    if (!bookingData) {
+        return <div>Memuat data pemesanan...</div>;
     }
-  }, [authLoading, user, setLoginRedirect, location]);
-  
-  if (!orderData) {
-    useEffect(() => { navigate("/"); }, [navigate]);
-    return null;
-  }
-  
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amount);
-  };
+    
+    const formatCurrency = (amount: number) => new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(amount);
 
-  const handleCreateOrder = async () => {
-    if (!user) {
-      toast({ title: "Error", description: "Anda harus login untuk membuat pesanan.", variant: "destructive" });
-      return;
-    }
-    setLoading(true);
+    return (
+        <div className="min-h-screen bg-gray-50">
+            <Navbar />
+            <div className="container mx-auto max-w-2xl px-4 py-8">
+                <Button variant="ghost" onClick={() => navigate(-1)} className="mb-4">
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Kembali ke Rincian
+                </Button>
+                <Card className="shadow-lg">
+                    <CardHeader>
+                        <CardTitle className="text-2xl">Pembayaran</CardTitle>
+                        <CardDescription>Selesaikan pembayaran untuk mengonfirmasi pesanan Anda.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                        <div className="p-4 bg-gray-100 rounded-lg">
+                            <h3 className="font-semibold">{bookingData.muaName}</h3>
+                            <p className="text-sm text-gray-600">{bookingData.service}</p>
+                            <p className="text-lg font-bold text-primary mt-2">Total: {formatCurrency(bookingData.totalPrice)}</p>
+                        </div>
 
-    try {
-      const { data: profile, error: profileError } = await supabase.from('profiles').select('id').eq('user_id', user.id).single();
-      if (profileError || !profile) throw profileError || new Error("Profil customer tidak ditemukan.");
-
-      const { data: booking, error: bookingError } = await supabase.from('bookings').insert({
-        customer_id: profile.id,
-        mua_profile_id: orderData.muaId,
-        service_id: orderData.serviceId,
-        booking_date: orderData.date,
-        booking_time: orderData.time,
-        total_price: orderData.total,
-        status: 'pending',
-      }).select().single();
-      if (bookingError) throw bookingError;
-
-      const { data: payment, error: paymentError } = await supabase.from('payments').insert({
-        booking_id: booking.id,
-        customer_id: profile.id,
-        amount: orderData.total,
-        payment_method: selectedPayment,
-        payment_status: 'pending',
-      }).select().single();
-      if (paymentError) throw paymentError;
-
-      navigate(`/waiting-for-payment/${payment.id}`, { state: { orderData, paymentData: payment } });
-
-    } catch (error: any) {
-      console.error("Error creating order:", error);
-      toast({ title: "Gagal Membuat Pesanan", description: error.message, variant: "destructive" });
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  const paymentMethods = [
-    { id: "bank_transfer", name: "Transfer Bank", icon: Landmark, description: "BCA, Mandiri, BRI, BNI" },
-    { id: "virtual_account", name: "Virtual Account", icon: Landmark, description: "BCA VA, Mandiri VA, dll." },
-    { id: "credit_card", name: "Kartu Kredit/Debit", icon: CreditCard, description: "Visa, Mastercard, JCB" },
-    { id: "qris", name: "QRIS", icon: QrCode, description: "Scan dari semua aplikasi pembayaran" },
-    { id: "e_wallet", name: "E-Wallet", icon: Wallet, description: "GoPay, OVO, DANA" },
-  ];
-
-  return (
-    <>
-      <AlertDialog open={showAuthAlert}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Anda Belum Masuk</AlertDialogTitle>
-            <AlertDialogDescription>
-              Untuk melanjutkan pembayaran, Anda harus masuk atau mendaftar sebagai pelanggan terlebih dahulu.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogAction onClick={() => navigate('/auth')}>
-            Ke Halaman Login
-          </AlertDialogAction>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <div className="min-h-screen bg-background">
-        <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
-          <div className="container mx-auto px-4 py-4">
-            <Button variant="ghost" onClick={() => navigate(-1)} className="flex items-center space-x-2">
-              <ArrowLeft className="w-4 h-4" />
-              <span>Kembali</span>
-            </Button>
-          </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="payment-method">Pilih Metode Pembayaran</Label>
+                            <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                                <SelectTrigger id="payment-method">
+                                    <SelectValue placeholder="Pilih cara bayar..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="credit_card">Kartu Kredit / Debit</SelectItem>
+                                    <SelectItem value="gopay">GoPay</SelectItem>
+                                    <SelectItem value="qris">QRIS</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        
+                        {paymentMethod === 'credit_card' && (
+                            <div className="space-y-4 border p-4 rounded-md">
+                                <div className="space-y-2">
+                                    <Label htmlFor="card-number">Nomor Kartu</Label>
+                                    <div className="relative">
+                                        <CreditCard className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                        <Input id="card-number" placeholder="0000 0000 0000 0000" className="pl-10" />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="expiry-date">Tanggal Kedaluwarsa</Label>
+                                        <Input id="expiry-date" placeholder="MM/YY" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="cvc">CVC</Label>
+                                        <div className="relative">
+                                            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                            <Input id="cvc" placeholder="123" className="pl-10" />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        
+                        <Button onClick={handlePayment} className="w-full" size="lg" disabled={isProcessing}>
+                            {isProcessing ? 'Memproses...' : `Bayar ${formatCurrency(bookingData.totalPrice)}`}
+                        </Button>
+                    </CardContent>
+                </Card>
+            </div>
         </div>
-        <div className="container mx-auto px-4 py-8 max-w-2xl">
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-foreground font-heading mb-2">Pembayaran</h1>
-            <p className="text-muted-foreground">Pilih metode pembayaran yang Anda inginkan</p>
-          </div>
-          <Card className="mb-6">
-            <CardHeader><CardTitle>Ringkasan Pesanan</CardTitle></CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex justify-between"><span className="text-muted-foreground">MUA</span><span className="font-medium">{orderData.muaName}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Layanan</span><span className="font-medium">{orderData.service}</span></div>
-              <hr className="border-border" />
-              <div className="flex justify-between text-lg font-bold">
-                <span>Total Pembayaran</span>
-                <span className="text-primary">{formatCurrency(orderData.total)}</span>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="mb-6">
-            <CardHeader><CardTitle>Metode Pembayaran</CardTitle></CardHeader>
-            <CardContent className="space-y-3">
-              {paymentMethods.map((method) => {
-                const Icon = method.icon;
-                return (
-                  <div key={method.id} className={`p-4 border rounded-lg cursor-pointer transition-all ${selectedPayment === method.id ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'}`} onClick={() => setSelectedPayment(method.id)}>
-                    <div className="flex items-center space-x-3">
-                      <Icon className="w-6 h-6 text-primary" />
-                      <div>
-                        <p className="font-medium">{method.name}</p>
-                        <p className="text-sm text-muted-foreground">{method.description}</p>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </CardContent>
-          </Card>
-          <Button onClick={handleCreateOrder} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground" size="lg" disabled={loading || !user}>
-            {loading ? "Memproses..." : `Bayar ${formatCurrency(orderData.total)}`}
-          </Button>
-        </div>
-      </div>
-    </>
-  );
+    );
 };
 
 export default Payment;

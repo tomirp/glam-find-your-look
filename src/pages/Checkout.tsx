@@ -1,220 +1,147 @@
-import { useState } from "react";
+// src/pages/Checkout.tsx
+
+import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
+
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, MapPin, Clock, Calendar as CalendarIcon, Car, Bike } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { ArrowLeft, Calendar, User, Palette, Car, Bike, Ban, Map, CreditCard, Landmark, Globe, Smartphone } from "lucide-react";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
+import Navbar from "@/components/Navbar";
 
 const Checkout = () => {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const { bookingData } = location.state || {};
-  
-  const [selectedTransport, setSelectedTransport] = useState("gojek");
-  
-  if (!bookingData) {
-    navigate("/");
-    return null;
-  }
+    const location = useLocation();
+    const navigate = useNavigate();
+    const { toast } = useToast();
+    const [bookingData, setBookingData] = useState<any>(null);
+    const [transportOption, setTransportOption] = useState("online");
+    
+    useEffect(() => {
+        if (location.state && location.state.bookingData) {
+            setBookingData(location.state.bookingData);
+        } else {
+            toast({ title: "Error", description: "Data pemesanan tidak ditemukan.", variant: "destructive" });
+            navigate('/');
+        }
+    }, [location, navigate, toast]);
 
-  const transportOptions = [
-    { id: "gojek", name: "GoJek", price: 15000, icon: Bike, available: true },
-    { id: "grab", name: "Grab", price: 18000, icon: Car, available: true },
-    { id: "private", name: "Kendaraan Pribadi", price: 0, icon: Car, available: false }
-  ];
+    if (!bookingData) {
+        return <div className="min-h-screen flex items-center justify-center">Memuat detail pesanan...</div>;
+    }
+    
+    // Mengambil data ketersediaan kendaraan dari bookingData
+    const muaVehicle = bookingData.vehicle || 'none';
+    const onlineTransportFee = 75000; // Contoh harga fix
+    
+    const platformFee = 5000;
+    const bookingPrice = parseInt(bookingData.price.replace(/[^0-9]/g, ''));
+    
+    // Kalkulasi biaya transportasi dinamis
+    const transportFee = transportOption === 'online' ? onlineTransportFee : 0;
+    const totalPrice = bookingPrice + platformFee + transportFee;
 
-  const servicePrice = parseInt(bookingData.price.replace(/[^\d]/g, ''));
-  const transportPrice = transportOptions.find(t => t.id === selectedTransport)?.price || 0;
-  const total = servicePrice + transportPrice;
+    const formatCurrency = (amount: number) => new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(amount);
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('id-ID', {
-      style: 'currency',
-      currency: 'IDR',
-      minimumFractionDigits: 0
-    }).format(amount);
-  };
+    return (
+        <div className="min-h-screen bg-gray-50">
+            <Navbar />
+            <div className="container mx-auto max-w-2xl px-4 py-8">
+                <Button variant="ghost" onClick={() => navigate(-1)} className="mb-4">
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Kembali
+                </Button>
+                <div className="space-y-6">
+                    {/* Rincian Pesanan */}
+                    <Card className="shadow-lg">
+                        <CardHeader><CardTitle className="text-xl">Rincian Pesanan</CardTitle></CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="flex items-center gap-3"><User className="h-5 w-5 text-primary" /><div><p className="font-semibold">{bookingData.muaName}</p></div></div>
+                            <div className="flex items-center gap-3"><Palette className="h-5 w-5 text-primary" /><div><p className="font-semibold">{bookingData.service}</p></div></div>
+                            <div className="flex items-center gap-3"><Calendar className="h-5 w-5 text-primary" /><div><p className="font-semibold">{new Date(bookingData.date).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long' })} pukul {bookingData.time}</p></div></div>
+                        </CardContent>
+                    </Card>
 
-  const handleProceedToPayment = () => {
-    const orderData = {
-      ...bookingData,
-      transport: selectedTransport,
-      transportPrice,
-      total
-    };
-    navigate("/payment", { state: { orderData } });
-  };
+                    {/* Opsi Transportasi */}
+                    <Card className="shadow-lg">
+                        <CardHeader><CardTitle className="text-xl">Opsi Transportasi</CardTitle></CardHeader>
+                        <CardContent>
+                            <RadioGroup value={transportOption} onValueChange={setTransportOption}>
+                                <Label htmlFor="transport-online" className="flex items-start gap-4 p-4 rounded-md border has-[:checked]:border-primary cursor-pointer transition-all">
+                                    <RadioGroupItem value="online" id="transport-online" />
+                                    <div className="flex-1">
+                                        <div className="flex justify-between font-semibold"><span>Transportasi Online</span><span>{formatCurrency(onlineTransportFee)}</span></div>
+                                        <p className="text-sm text-muted-foreground">MUA akan menggunakan transportasi online ke lokasi Anda.</p>
+                                        <div className="mt-2 p-2 bg-gray-100 rounded-md flex items-center gap-2 text-sm text-gray-600">
+                                            <Map className="h-8 w-8 text-primary" />
+                                            <span>Ini adalah placeholder peta. Klik untuk melihat rute dari lokasi MUA ke lokasi Anda.</span>
+                                        </div>
+                                    </div>
+                                </Label>
+                                <Label htmlFor="transport-private" className={`flex items-start gap-4 p-4 rounded-md border mt-4 transition-all ${muaVehicle === 'none' ? 'cursor-not-allowed bg-gray-50 text-gray-400' : 'has-[:checked]:border-primary cursor-pointer'}`}>
+                                    <RadioGroupItem value="private" id="transport-private" disabled={muaVehicle === 'none'} />
+                                    <div className="flex-1">
+                                        <div className="flex justify-between font-semibold"><span>Menggunakan Kendaraan Pribadi</span><span className="text-green-600">Gratis</span></div>
+                                        <p className="text-sm">MUA akan datang menggunakan kendaraan pribadi.</p>
+                                        <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
+                                            {muaVehicle === 'motorcycle' && <><Bike className="h-4 w-4" /><span>Motor</span></>}
+                                            {muaVehicle === 'car' && <><Car className="h-4 w-4" /><span>Mobil</span></>}
+                                            {muaVehicle === 'none' && <><Ban className="h-4 w-4" /><span>Kendaraan tidak tersedia</span></>}
+                                        </div>
+                                    </div>
+                                </Label>
+                            </RadioGroup>
+                        </CardContent>
+                    </Card>
 
-  return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
-        <div className="container mx-auto px-4 py-4">
-          <Button 
-            variant="ghost" 
-            onClick={() => navigate(-1)}
-            className="flex items-center space-x-2"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Kembali</span>
-          </Button>
-        </div>
-      </div>
+                    {/* Metode Pembayaran */}
+                    <Card className="shadow-lg">
+                        <CardHeader><CardTitle className="text-xl">Metode Pembayaran</CardTitle></CardHeader>
+                        <CardContent>
+                            <Accordion type="single" collapsible className="w-full" defaultValue="item-1">
+                                <AccordionItem value="item-1">
+                                    <AccordionTrigger className="font-semibold"><CreditCard className="h-5 w-5 mr-3 text-primary"/>Kartu Kredit/Debit</AccordionTrigger>
+                                    <AccordionContent className="pt-4">Pilih opsi ini untuk membayar dengan kartu Visa, Mastercard, atau lainnya. Anda akan diarahkan ke halaman pembayaran yang aman.</AccordionContent>
+                                </AccordionItem>
+                                <AccordionItem value="item-2">
+                                    <AccordionTrigger className="font-semibold"><Smartphone className="h-5 w-5 mr-3 text-primary"/>Mobile Banking</AccordionTrigger>
+                                    <AccordionContent className="pt-4">Bayar langsung dari aplikasi mobile banking Anda melalui Virtual Account. Kode pembayaran akan ditampilkan di langkah berikutnya.</AccordionContent>
+                                </AccordionItem>
+                                <AccordionItem value="item-3">
+                                    <AccordionTrigger className="font-semibold"><Landmark className="h-5 w-5 mr-3 text-primary"/>Transfer Bank (ATM)</AccordionTrigger>
+                                    <AccordionContent className="pt-4">Lakukan pembayaran melalui mesin ATM terdekat ke nomor Virtual Account yang akan kami berikan.</AccordionContent>
+                                </AccordionItem>
+                                <AccordionItem value="item-4">
+                                    <AccordionTrigger className="font-semibold"><Globe className="h-5 w-5 mr-3 text-primary"/>Internet Banking</AccordionTrigger>
+                                    <AccordionContent className="pt-4">Bayar langsung dari situs web internet banking Anda. Instruksi lengkap akan diberikan setelah Anda melanjutkan.</AccordionContent>
+                                </AccordionItem>
+                            </Accordion>
+                        </CardContent>
+                    </Card>
 
-      <div className="container mx-auto px-4 py-8 max-w-2xl">
-        {/* Title */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-foreground font-heading mb-2">
-            Ringkasan Pesanan
-          </h1>
-          <p className="text-muted-foreground">
-            Periksa kembali detail booking Anda
-          </p>
-        </div>
-
-        {/* Order Details */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <CalendarIcon className="w-5 h-5" />
-              <span>Detail Booking</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">MUA</span>
-              <span className="font-medium">{bookingData.muaName}</span>
-            </div>
-            
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Layanan</span>
-              <span className="font-medium">{bookingData.service}</span>
-            </div>
-            
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Tanggal</span>
-              <span className="font-medium">
-                {new Date(bookingData.date).toLocaleDateString('id-ID', {
-                  weekday: 'long',
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric'
-                })}
-              </span>
-            </div>
-            
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Waktu</span>
-              <span className="font-medium">{bookingData.time}</span>
-            </div>
-            
-            <div className="flex justify-between items-center">
-              <span className="text-muted-foreground">Lokasi</span>
-              <div className="flex items-center space-x-1">
-                <MapPin className="w-4 h-4 text-muted-foreground" />
-                <span className="font-medium">{bookingData.muaLocation}</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Location Map Placeholder */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Lokasi MUA</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="aspect-video bg-gradient-to-br from-primary/20 to-secondary/30 rounded-lg flex items-center justify-center">
-              <div className="text-center">
-                <MapPin className="w-12 h-12 text-primary mx-auto mb-2" />
-                <p className="text-muted-foreground">Peta Lokasi</p>
-                <p className="text-sm text-muted-foreground">{bookingData.muaLocation}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Transportation */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Car className="w-5 h-5" />
-              <span>Pilih Transportasi</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {transportOptions.map((transport) => {
-              const Icon = transport.icon;
-              return (
-                <div
-                  key={transport.id}
-                  className={`p-4 border rounded-lg cursor-pointer transition-all ${
-                    !transport.available 
-                      ? 'opacity-50 cursor-not-allowed bg-muted' 
-                      : selectedTransport === transport.id
-                      ? 'border-primary bg-primary/5'
-                      : 'border-border hover:border-primary/50'
-                  }`}
-                  onClick={() => transport.available && setSelectedTransport(transport.id)}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <Icon className="w-5 h-5" />
-                      <div>
-                        <p className="font-medium">{transport.name}</p>
-                        {!transport.available && (
-                          <Badge variant="secondary" className="text-xs mt-1">
-                            Tidak Tersedia
-                          </Badge>
-                        )}
-                      </div>
+                    {/* Rincian Biaya & Tombol Bayar */}
+                    <div className="space-y-2 pt-4">
+                        <div className="flex justify-between text-sm"><p>Harga Layanan</p><p>{formatCurrency(bookingPrice)}</p></div>
+                        <div className="flex justify-between text-sm"><p>Biaya Transportasi</p><p>{formatCurrency(transportFee)}</p></div>
+                        <div className="flex justify-between text-sm"><p>Biaya Platform</p><p>{formatCurrency(platformFee)}</p></div>
+                        <Separator className="my-2" />
+                        <div className="flex justify-between font-bold text-lg"><p>Total Pembayaran</p><p>{formatCurrency(totalPrice)}</p></div>
                     </div>
-                    <span className="font-semibold">
-                      {transport.price === 0 ? 'Gratis' : formatCurrency(transport.price)}
-                    </span>
-                  </div>
+                    
+                    <Button
+                        onClick={() => navigate('/payment', { state: { bookingData: {...bookingData, totalPrice} } })}
+                        className="w-full"
+                        size="lg"
+                    >
+                        Lanjutkan Pembayaran
+                    </Button>
                 </div>
-              );
-            })}
-          </CardContent>
-        </Card>
-
-        {/* Price Summary */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Rincian Biaya</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex justify-between">
-              <span>Subtotal Layanan</span>
-              <span>{formatCurrency(servicePrice)}</span>
             </div>
-            
-            <div className="flex justify-between">
-              <span>Biaya Transportasi</span>
-              <span>{formatCurrency(transportPrice)}</span>
-            </div>
-            
-            <hr className="border-border" />
-            
-            <div className="flex justify-between text-lg font-bold">
-              <span>Total</span>
-              <span className="text-primary">{formatCurrency(total)}</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Proceed Button */}
-        <Button 
-          onClick={handleProceedToPayment}
-          className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
-          size="lg"
-        >
-          Lanjut ke Pembayaran
-        </Button>
-      </div>
-    </div>
-  );
+        </div>
+    );
 };
 
 export default Checkout;

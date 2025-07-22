@@ -24,6 +24,7 @@ interface BookingModalProps {
     id: string | undefined;
     name: string;
     location: string;
+    vehicle: 'none' | 'motorcycle' | 'car'; // Tambahkan baris ini
     styles: Array<{
       id: string;
       name: string;
