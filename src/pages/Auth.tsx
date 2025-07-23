@@ -1,3 +1,5 @@
+// src/pages/Auth.tsx
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -7,12 +9,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useAuth } from "@/contexts/AuthContext";
-// **PERBAIKAN 1: Ganti useToast dengan 'sonner'**
 import { toast } from "sonner"; 
 import { Eye, EyeOff, ArrowLeft } from "lucide-react";
 
 const Auth = () => {
   const navigate = useNavigate();
+  // PERBAIKAN: Menggunakan semua state yang relevan dari useAuth
   const { signIn, signUp, user, role, muaProfileExists, loading: authLoading, loginRedirect, clearLoginRedirect } = useAuth();
   
   const [activeTab, setActiveTab] = useState("login");
@@ -25,26 +27,24 @@ const Auth = () => {
     userType: "customer" as "customer" | "mua",
   });
 
+  // PERBAIKAN: Logika redirect ini disempurnakan untuk memprioritaskan 'loginRedirect'
   useEffect(() => {
-    // Jika proses autentikasi masih berjalan atau user belum login, jangan lakukan apa-apa.
     if (authLoading || !user) {
       return;
     }
-
-    // PERBAIKAN: Untuk MUA, tunggu hingga pengecekan profil selesai (muaProfileExists tidak lagi null).
     if (role === 'mua' && muaProfileExists === null) {
       return;
     }
 
-    // Jika ada redirect yang tertunda (misalnya, akses halaman terproteksi sebelum login),
+    // Prioritas 1: Jika ada redirect tertunda (misalnya, dari tombol "Pesan Sekarang"),
     // arahkan ke sana terlebih dahulu.
     if (loginRedirect) {
       navigate(loginRedirect.pathname, { state: loginRedirect.state, replace: true });
-      clearLoginRedirect();
+      clearLoginRedirect(); // Hapus redirect agar tidak berjalan lagi
       return;
     }
 
-    // Logika redirect standar setelah login berhasil dan pengecekan profil selesai.
+    // Prioritas 2: Logika redirect standar setelah login
     if (role === 'mua') {
       navigate(muaProfileExists ? '/mua/profile' : '/mua/onboarding', { replace: true });
     } else if (role === 'customer') {
@@ -52,7 +52,6 @@ const Auth = () => {
     }
     
   }, [user, role, authLoading, muaProfileExists, navigate, loginRedirect, clearLoginRedirect]);
-
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,7 +61,6 @@ const Auth = () => {
     
     if (error) {
       if (error.message.includes("Email not confirmed")) {
-        // **PERBAIKAN 2: Menggunakan toast.error dari 'sonner'**
         toast.error("Verifikasi Diperlukan", {
             description: "Silakan periksa dan klik link verifikasi di email Anda sebelum masuk."
         });
@@ -73,11 +71,12 @@ const Auth = () => {
       }
       setLoading(false);
     } else {
-      // **PERBAIKAN 3: Menggunakan toast.success dari 'sonner' yang sudah ada ikonnya**
       toast.success("Anda Berhasil Masuk", {
         description: "Anda akan diarahkan sebentar lagi...",
       });
+      // Tidak perlu `Maps` di sini, useEffect akan menanganinya
     }
+    // setLoading akan tetap true hingga redirect terjadi
   };
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -140,7 +139,7 @@ const Auth = () => {
                         <TabsTrigger value="register">Daftar</TabsTrigger>
                     </TabsList>
                     <TabsContent value="login">
-                        <form onSubmit={handleLogin} className="space-y-4">
+                        <form onSubmit={handleLogin} className="space-y-4 pt-4">
                             <div className="space-y-2">
                                 <Label htmlFor="email">Email</Label>
                                 <Input id="email" type="email" placeholder="nama@email.com" value={loginData.email} onChange={(e) => setLoginData({ ...loginData, email: e.target.value })} required />
@@ -160,7 +159,7 @@ const Auth = () => {
                         </form>
                     </TabsContent>
                     <TabsContent value="register">
-                        <form onSubmit={handleRegister} className="space-y-4">
+                        <form onSubmit={handleRegister} className="space-y-4 pt-4">
                             <div className="space-y-2">
                                 <Label htmlFor="userType">Jenis Akun</Label>
                                 <RadioGroup value={registerData.userType} onValueChange={(value) => setRegisterData({ ...registerData, userType: value as "customer" | "mua" })} className="flex flex-row space-x-6">

@@ -7,13 +7,13 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 
 import Navbar from "@/components/Navbar";
-import { Button } from "@/components/ui/button"; // PERUBAHAN: Impor Button
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
-import { Calendar, Clock, AlertTriangle, ArrowLeft } from "lucide-react";
-import { SearchingReplacementCard } from "@/components/SearchingReplacementCard"; // Kita pakai lagi kartu SOS
+import { Calendar, Clock, AlertTriangle, ArrowLeft, ArrowRight } from "lucide-react"; // PERBAIKAN: Impor ArrowRight
+import { SearchingReplacementCard } from "@/components/SearchingReplacementCard";
 
 // Tipe data booking dari CustomerProfile.tsx
 interface Booking {
@@ -44,7 +44,7 @@ const getStatusColor = (status: string) => {
 const Activity = () => {
     const { user, loading: authLoading } = useAuth();
     const { toast } = useToast();
-    const navigate = useNavigate(); // PERUBAHAN: Tambahkan hook navigate
+    const navigate = useNavigate();
     const [bookings, setBookings] = useState<Booking[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -83,6 +83,7 @@ const Activity = () => {
     const rejectedBookings = bookings.filter(b => b.status === 'rejected');
     const completedBookings = bookings.filter(b => b.status === 'completed');
 
+    // PERBAIKAN UTAMA: Tambahkan tombol "Lihat Invoice" di dalam BookingCard
     const BookingCard = ({ booking }: { booking: Booking }) => (
         <div className="p-4 sm:p-6 bg-accent/30 rounded-xl border border-border">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -94,9 +95,20 @@ const Activity = () => {
                         <span>{new Date(booking.booking_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
                     </div>
                 </div>
-                <div className="w-full sm:w-auto flex flex-row sm:flex-col items-center sm:items-end justify-between gap-2">
-                    <Badge className={`${getStatusColor(booking.status)} border`}>{booking.status}</Badge>
-                    <p className="font-bold text-lg text-primary sm:mt-2 text-right whitespace-nowrap">{formatCurrency(booking.total_price)}</p>
+                <div className="w-full sm:w-auto flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                    <div className="flex flex-col items-start sm:items-end gap-2">
+                        <Badge className={`${getStatusColor(booking.status)} border`}>{booking.status}</Badge>
+                        <p className="font-bold text-lg text-primary sm:mt-1 text-right whitespace-nowrap">{formatCurrency(booking.total_price)}</p>
+                    </div>
+                    <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => navigate('/confirmation', { state: { bookingId: booking.id } })}
+                        className="w-full sm:w-auto"
+                    >
+                        Lihat Invoice
+                        <ArrowRight className="h-4 w-4 ml-2" />
+                    </Button>
                 </div>
             </div>
         </div>
@@ -121,7 +133,6 @@ const Activity = () => {
         <div className="min-h-screen bg-background pb-16 md:pb-0">
             <Navbar />
             <div className="container mx-auto px-4 py-8">
-                {/* PERUBAHAN: Tambahkan tombol Kembali ke Beranda di sini */}
                 <div className="mb-6">
                     <Button variant="ghost" onClick={() => navigate("/")}>
                         <ArrowLeft className="h-4 w-4 mr-2" />

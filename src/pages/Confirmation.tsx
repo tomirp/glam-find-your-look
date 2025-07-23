@@ -1,217 +1,161 @@
-import { useState, useEffect } from "react";
+// src/pages/Confirmation.tsx
+
+import { useState, useEffect, useCallback } from "react"; // PERBAIKAN: Impor useCallback
 import { useLocation, useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import Navbar from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Clock, CheckCircle, Calendar as CalendarIcon, MapPin, CreditCard } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { CheckCircle, Calendar, Home, Printer } from "lucide-react";
+
+interface ConfirmationDetails {
+  id: string;
+  total_price: number;
+  booking_date: string;
+  booking_time: string;
+  mua_profiles: {
+    business_name: string;
+    location_address: string;
+  };
+  services: {
+    name: string;
+  };
+  profiles: {
+    full_name: string;
+    address: string;
+  };
+}
 
 const Confirmation = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { paymentData } = location.state || {};
-  
-  const [status, setStatus] = useState<"waiting" | "success">("waiting");
-  
+  const { user } = useAuth();
+  const [bookingDetails, setBookingDetails] = useState<ConfirmationDetails | null>(null);
+  const [loading, setLoading] = useState(true);
+  const bookingId = location.state?.bookingId;
+
+  // PERBAIKAN UTAMA: Bungkus fungsi fetchBookingDetails dengan useCallback
+  const fetchBookingDetails = useCallback(async () => {
+    if (!bookingId || !user) {
+      navigate('/');
+      return;
+    }
+
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('bookings')
+      .select(`
+        id, total_price, booking_date, booking_time,
+        mua_profiles ( business_name, location_address ),
+        services ( name ),
+        profiles!bookings_customer_id_fkey ( full_name, address )
+      `)
+      .eq('id', bookingId)
+      .single();
+
+    if (error || !data) {
+      console.error("Error fetching confirmation details:", error);
+      navigate('/');
+    } else {
+      setBookingDetails(data as ConfirmationDetails);
+    }
+    setLoading(false);
+  }, [bookingId, user, navigate]); // Definisikan dependensi untuk useCallback
+
   useEffect(() => {
-    // Simulate payment processing
-    const timer = setTimeout(() => {
-      setStatus("success");
-    }, 5000);
+    fetchBookingDetails();
+  }, [fetchBookingDetails]); // Sekarang useEffect hanya bergantung pada fungsi yang stabil
 
-    return () => clearTimeout(timer);
-  }, []);
+  const formatCurrency = (amount: number) => new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(amount);
 
-  if (!paymentData) {
-    navigate("/");
-    return null;
-  }
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('id-ID', {
-      style: 'currency',
-      currency: 'IDR',
-      minimumFractionDigits: 0
-    }).format(amount);
-  };
-
-  const getPaymentMethodName = (method: string) => {
-    const methods: { [key: string]: string } = {
-      credit_card: "Kartu Kredit/Debit",
-      bank_transfer: "Transfer Bank",
-      e_wallet: "E-Wallet",
-      qris: "QRIS"
-    };
-    return methods[method] || method;
-  };
-
-  if (status === "waiting") {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center space-y-6 max-w-md mx-auto px-4">
-          <div className="animate-spin w-16 h-16 border-4 border-primary border-t-transparent rounded-full mx-auto"></div>
-          
-          <div>
-            <h1 className="text-2xl font-bold text-foreground font-heading mb-2">
-              Memproses Pembayaran
-            </h1>
-            <p className="text-muted-foreground">
-              Mohon tunggu sebentar, kami sedang memverifikasi pembayaran Anda...
-            </p>
-          </div>
-          
-          <div className="flex items-center justify-center space-x-2 text-primary">
-            <Clock className="w-5 h-5" />
-            <span className="text-sm">Menunggu Pembayaran</span>
-          </div>
-        </div>
-      </div>
-    );
+  if (loading || !bookingDetails) {
+    return <div className="min-h-screen flex items-center justify-center">Memuat Invoice...</div>;
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-8 max-w-2xl">
-        {/* Success Header */}
-        <div className="text-center mb-8">
-          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <CheckCircle className="w-12 h-12 text-green-600" />
-          </div>
-          
-          <h1 className="text-3xl font-bold text-foreground font-heading mb-2">
-            Pembayaran Berhasil!
-          </h1>
-          <p className="text-muted-foreground">
-            Terima kasih! Booking Anda telah dikonfirmasi
-          </p>
-        </div>
-
-        {/* Order Details */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span>Detail Pesanan</span>
-              <Badge variant="default" className="bg-green-100 text-green-800">
-                Terkonfirmasi
-              </Badge>
-            </CardTitle>
+    <div className="min-h-screen bg-gray-50">
+      <Navbar />
+      <div className="container mx-auto max-w-2xl px-4 py-12">
+        <Card className="shadow-lg">
+          <CardHeader className="items-center bg-green-50 p-6">
+            <CheckCircle className="h-12 w-12 text-green-500 mb-2" />
+            <CardTitle className="text-2xl font-bold">Pembayaran Berhasil!</CardTitle>
+            <CardDescription className="text-muted-foreground">
+              Invoice untuk pesanan #{bookingDetails.id.substring(0, 8).toUpperCase()}
+            </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Order ID</span>
-              <span className="font-mono font-medium">{paymentData.orderId}</span>
-            </div>
-            
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">MUA</span>
-              <span className="font-medium">{paymentData.muaName}</span>
-            </div>
-            
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Layanan</span>
-              <span className="font-medium">{paymentData.service}</span>
-            </div>
-            
-            <div className="flex justify-between items-center">
-              <span className="text-muted-foreground">Tanggal & Waktu</span>
-              <div className="flex items-center space-x-1">
-                <CalendarIcon className="w-4 h-4 text-muted-foreground" />
-                <span className="font-medium">
-                  {new Date(paymentData.date).toLocaleDateString('id-ID')} - {paymentData.time}
-                </span>
+          <CardContent className="p-6 space-y-6">
+            <div className="grid grid-cols-2 gap-6 text-sm">
+              <div>
+                <h3 className="font-semibold mb-2 text-gray-500">DITAGIHKAN KEPADA:</h3>
+                <p className="font-bold">{bookingDetails.profiles.full_name}</p>
+                <p className="text-muted-foreground">{bookingDetails.profiles.address || 'Alamat tidak tersedia'}</p>
+              </div>
+              <div className="text-right">
+                <h3 className="font-semibold mb-2 text-gray-500">DIBAYAR KEPADA:</h3>
+                <p className="font-bold">{bookingDetails.mua_profiles.business_name}</p>
+                <p className="text-muted-foreground">{bookingDetails.mua_profiles.location_address || 'Alamat MUA tidak tersedia'}</p>
               </div>
             </div>
             
-            <div className="flex justify-between items-center">
-              <span className="text-muted-foreground">Lokasi</span>
-              <div className="flex items-center space-x-1">
-                <MapPin className="w-4 h-4 text-muted-foreground" />
-                <span className="font-medium">{paymentData.muaLocation}</span>
+            <Separator />
+
+            <div>
+              <h3 className="font-semibold mb-4">Rincian Layanan</h3>
+              <div className="flow-root">
+                <dl className="-my-4 divide-y divide-gray-200 text-sm">
+                  <div className="flex items-center justify-between py-4">
+                    <dt className="text-muted-foreground">Layanan</dt>
+                    <dd className="font-medium">{bookingDetails.services.name}</dd>
+                  </div>
+                  <div className="flex items-center justify-between py-4">
+                    <dt className="text-muted-foreground">Jadwal</dt>
+                    <dd className="font-medium">
+                      {new Date(bookingDetails.booking_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}, {bookingDetails.booking_time}
+                    </dd>
+                  </div>
+                </dl>
               </div>
+            </div>
+
+            <Separator />
+            
+            <div className="flow-root">
+              <dl className="space-y-4 text-sm">
+                 <div className="flex items-center justify-between">
+                    <dt className="text-muted-foreground">Subtotal</dt>
+                    <dd className="font-medium">{formatCurrency(bookingDetails.total_price - 5000)}</dd>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <dt className="text-muted-foreground">Biaya Platform</dt>
+                    <dd className="font-medium">{formatCurrency(5000)}</dd>
+                  </div>
+                   <div className="flex items-center justify-between font-bold text-base">
+                    <dt>Total</dt>
+                    <dd>{formatCurrency(bookingDetails.total_price)}</dd>
+                  </div>
+              </dl>
+            </div>
+            
+            <div className="flex flex-col sm:flex-row gap-4 pt-6">
+              <Button onClick={() => navigate('/aktivitas')} className="flex-1 h-14 text-base font-semibold">
+                <Calendar className="h-5 w-5 mr-3" />
+                Lihat Aktivitas Pesanan
+              </Button>
+              <Button onClick={() => window.print()} variant="outline" className="flex-1 h-14 text-base font-semibold">
+                <Printer className="h-5 w-5 mr-3" />
+                Cetak Invoice
+              </Button>
+            </div>
+            <div className="text-center">
+                <Button onClick={() => navigate('/')} variant="link" className="text-muted-foreground">
+                    Kembali ke Beranda
+                </Button>
             </div>
           </CardContent>
         </Card>
-
-        {/* Payment Details */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <CreditCard className="w-5 h-5" />
-              <span>Rincian Pembayaran</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Metode Pembayaran</span>
-              <span className="font-medium">{getPaymentMethodName(paymentData.paymentMethod)}</span>
-            </div>
-            
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Subtotal Layanan</span>
-              <span>{formatCurrency(paymentData.total - paymentData.transportPrice)}</span>
-            </div>
-            
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Biaya Transportasi</span>
-              <span>{formatCurrency(paymentData.transportPrice)}</span>
-            </div>
-            
-            <hr className="border-border" />
-            
-            <div className="flex justify-between text-lg font-bold">
-              <span>Total Dibayar</span>
-              <span className="text-primary">{formatCurrency(paymentData.total)}</span>
-            </div>
-            
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Waktu Pembayaran</span>
-              <span className="text-sm">
-                {new Date(paymentData.timestamp).toLocaleString('id-ID')}
-              </span>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Next Steps */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Langkah Selanjutnya</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3 text-sm">
-              <div className="flex items-start space-x-2">
-                <div className="w-2 h-2 bg-primary rounded-full mt-2"></div>
-                <p>MUA akan menghubungi Anda untuk konfirmasi jadwal dalam 1x24 jam</p>
-              </div>
-              <div className="flex items-start space-x-2">
-                <div className="w-2 h-2 bg-primary rounded-full mt-2"></div>
-                <p>Detail kontak MUA akan dikirim via email dan notifikasi in-app</p>
-              </div>
-              <div className="flex items-start space-x-2">
-                <div className="w-2 h-2 bg-primary rounded-full mt-2"></div>
-                <p>Anda dapat mengubah atau membatalkan booking hingga 24 jam sebelum jadwal</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Action Buttons */}
-        <div className="space-y-3">
-          <Button 
-            onClick={() => navigate("/")}
-            className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
-            size="lg"
-          >
-            Kembali ke Beranda
-          </Button>
-          
-          <Button 
-            variant="outline"
-            onClick={() => window.print()}
-            className="w-full"
-          >
-            Cetak Receipt
-          </Button>
-        </div>
       </div>
     </div>
   );
