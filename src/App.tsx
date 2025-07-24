@@ -22,6 +22,8 @@ import Activity from "./pages/Activity";
 import ChatPage from "./pages/ChatPage";
 import ProtectedRoute from "./components/ProtectedRoute"; // Pastikan impor ini benar
 import BottomNav from "./components/BottomNav"; // PERUBAHAN: Impor BottomNav
+import LeaveReview from "./pages/LeaveReview"; // Impor halaman baru
+
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { refetchOnWindowFocus: false } },
@@ -51,6 +53,7 @@ const App = () => (
                 <Route element={<ProtectedRoute allowedRoles={['customer']} />}>
                   <Route path="/customer/profile" element={<CustomerProfile />} />
                   <Route path="/aktivitas" element={<Activity />} />
+                  <Route path="/review/:bookingId" element={<LeaveReview />} />
                   <Route path="/checkout" element={<Checkout />} />
                   <Route path="/payment" element={<Payment />} />
                   <Route path="/waiting-for-payment/:paymentId" element={<WaitingForPayment />} />

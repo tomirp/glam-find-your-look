@@ -564,6 +564,14 @@ export type Database = {
         Args: { p_booking_id: string }
         Returns: undefined
       }
+      cancel_booking_by_customer: {
+        Args: { p_booking_id: string }
+        Returns: undefined
+      }
+      complete_booking: {
+        Args: { p_booking_id: string }
+        Returns: undefined
+      }
       create_new_booking: {
         Args: {
           p_mua_profile_id: string

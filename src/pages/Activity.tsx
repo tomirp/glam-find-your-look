@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
-import { Calendar, Clock, AlertTriangle, ArrowLeft, ArrowRight } from "lucide-react"; // PERBAIKAN: Impor ArrowRight
+import { Calendar, ArrowLeft, ArrowRight, Star, XCircle } from "lucide-react";
 import { SearchingReplacementCard } from "@/components/SearchingReplacementCard";
 
 // Tipe data booking dari CustomerProfile.tsx
@@ -48,42 +48,55 @@ const Activity = () => {
     const [bookings, setBookings] = useState<Booking[]>([]);
     const [loading, setLoading] = useState(true);
 
+    const fetchBookings = async () => {
+        if (!user) return;
+        setLoading(true);
+        try {
+            const { data: profileData, error: profileError } = await supabase.from('profiles').select('id').eq('user_id', user.id).single();
+            if (profileError) throw profileError;
+
+            const { data: bookingsData, error: bookingError } = await supabase
+                .from('bookings')
+                .select(`*, mua_profiles(business_name), services(name), payments!left(payment_status)`)
+                .eq('customer_id', profileData.id)
+                .order('booking_date', { ascending: false });
+
+            if (bookingError) throw bookingError;
+
+            const typedBookings = bookingsData.map(b => ({ ...b, payments: Array.isArray(b.payments) ? b.payments[0] : b.payments })) as Booking[];
+            setBookings(typedBookings);
+        } catch (error: any) {
+            toast({ title: "Error", description: "Gagal memuat data aktivitas.", variant: "destructive" });
+        } finally {
+            setLoading(false);
+        }
+    };
+
     useEffect(() => {
-        const fetchBookings = async () => {
-            if (!user) return;
-            setLoading(true);
-            try {
-                const { data: profileData, error: profileError } = await supabase.from('profiles').select('id').eq('user_id', user.id).single();
-                if (profileError) throw profileError;
-
-                const { data: bookingsData, error: bookingError } = await supabase
-                    .from('bookings')
-                    .select(`*, mua_profiles(business_name), services(name), payments!left(payment_status)`)
-                    .eq('customer_id', profileData.id)
-                    .order('booking_date', { ascending: false });
-
-                if (bookingError) throw bookingError;
-
-                const typedBookings = bookingsData.map(b => ({ ...b, payments: Array.isArray(b.payments) ? b.payments[0] : b.payments })) as Booking[];
-                setBookings(typedBookings);
-            } catch (error: any) {
-                toast({ title: "Error", description: "Gagal memuat data aktivitas.", variant: "destructive" });
-            } finally {
-                setLoading(false);
-            }
-        };
-
         if (!authLoading && user) {
             fetchBookings();
         }
     }, [user, authLoading, toast]);
+
+    const handleCancelBooking = async (bookingId: string) => {
+        if (!window.confirm("Apakah Anda yakin ingin membatalkan pesanan ini?")) return;
+        
+        toast({ description: "Memproses pembatalan..." });
+        try {
+            const { error } = await supabase.rpc('cancel_booking_by_customer', { p_booking_id: bookingId });
+            if (error) throw error;
+            toast({ title: "Berhasil", description: "Pesanan Anda telah dibatalkan."});
+            fetchBookings(); // Muat ulang data untuk menampilkan status terbaru
+        } catch (error: any) {
+            toast({ title: "Gagal", description: error.message, variant: "destructive" });
+        }
+    };
 
     const activeBookings = bookings.filter(b => b.status === 'pending' || b.status === 'accepted');
     const cancelledBookings = bookings.filter(b => b.status === 'cancelled');
     const rejectedBookings = bookings.filter(b => b.status === 'rejected');
     const completedBookings = bookings.filter(b => b.status === 'completed');
 
-    // PERBAIKAN UTAMA: Tambahkan tombol "Lihat Invoice" di dalam BookingCard
     const BookingCard = ({ booking }: { booking: Booking }) => (
         <div className="p-4 sm:p-6 bg-accent/30 rounded-xl border border-border">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -100,15 +113,34 @@ const Activity = () => {
                         <Badge className={`${getStatusColor(booking.status)} border`}>{booking.status}</Badge>
                         <p className="font-bold text-lg text-primary sm:mt-1 text-right whitespace-nowrap">{formatCurrency(booking.total_price)}</p>
                     </div>
-                    <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => navigate('/confirmation', { state: { bookingId: booking.id } })}
-                        className="w-full sm:w-auto"
-                    >
-                        Lihat Invoice
-                        <ArrowRight className="h-4 w-4 ml-2" />
-                    </Button>
+                    <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto self-stretch">
+                        <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => navigate('/confirmation', { state: { bookingId: booking.id } })}
+                            className="w-full sm:w-auto"
+                        >
+                            Lihat Invoice
+                        </Button>
+                        {booking.status === 'completed' && (
+                            // **PERBAIKAN DI SINI:** Mengarahkan ke halaman ulasan yang benar
+                            <Button size="sm" onClick={() => navigate(`/review/${booking.id}`)} className="w-full sm:w-auto">
+                                <Star className="h-4 w-4 mr-2" />
+                                Berikan Ulasan
+                            </Button>
+                        )}
+                        {(booking.status === 'pending' || booking.status === 'accepted') && (
+                            <Button 
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => handleCancelBooking(booking.id)}
+                                className="w-full sm:w-auto"
+                            >
+                                <XCircle className="h-4 w-4 mr-2" />
+                                Batalkan Pesanan
+                            </Button>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>
@@ -147,24 +179,14 @@ const Activity = () => {
                     </CardHeader>
                     <CardContent>
                         <Tabs defaultValue="aktif" className="w-full">
-                            <div className="relative">
-                                <Carousel opts={{ align: "start", skipSnaps: true }}>
-                                    <CarouselContent className="-ml-2">
-                                        <TabsList className="bg-transparent p-1 inline-flex">
-                                            <CarouselItem className="pl-2 basis-auto">
-                                                <TabsTrigger value="aktif" className="whitespace-nowrap">Pesanan Aktif</TabsTrigger>
-                                            </CarouselItem>
-                                            <CarouselItem className="pl-2 basis-auto">
-                                                <TabsTrigger value="dibatalkan" className="whitespace-nowrap">Pesanan Dibatalkan</TabsTrigger>
-                                            </CarouselItem>
-                                            <CarouselItem className="pl-2 basis-auto">
-                                                <TabsTrigger value="selesai" className="whitespace-nowrap">Pesanan Selesai</TabsTrigger>
-                                            </CarouselItem>
-                                        </TabsList>
-                                    </CarouselContent>
-                                    <CarouselPrevious className="absolute -left-4 top-1/2 -translate-y-1/2" />
-                                    <CarouselNext className="absolute -right-4 top-1/2 -translate-y-1/2" />
-                                </Carousel>
+                            <div className="relative scroll-shadows">
+                                <div className="overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                                    <TabsList className="bg-transparent p-1 inline-flex">
+                                        <TabsTrigger value="aktif" className="whitespace-nowrap">Pesanan Aktif</TabsTrigger>
+                                        <TabsTrigger value="dibatalkan" className="whitespace-nowrap">Pesanan Dibatalkan</TabsTrigger>
+                                        <TabsTrigger value="selesai" className="whitespace-nowrap">Pesanan Selesai</TabsTrigger>
+                                    </TabsList>
+                                </div>
                             </div>
 
                             <TabsContent value="aktif" className="mt-6">

@@ -54,12 +54,24 @@ export const DashboardTab = ({ bookings, services, onBookingUpdate }: DashboardT
     }
   };
 
+  // PERUBAHAN BARU: Fungsi untuk menandai pesanan selesai
+  const handleCompleteBooking = async (bookingId: string) => {
+    toast({ description: "Menyelesaikan pesanan..." });
+    try {
+      const { error } = await supabase.rpc('complete_booking', { p_booking_id: bookingId });
+      if (error) throw error;
+      toast({ title: "Berhasil", description: "Pesanan telah ditandai sebagai selesai." });
+      onBookingUpdate();
+    } catch (error: any) {
+      toast({ title: "Gagal", description: error.message, variant: "destructive" });
+    }
+  };
+
   const pendingBookings = bookings.filter(b => b.status === 'pending');
   const activeBookings = bookings.filter(b => b.status === 'accepted');
 
   return (
     <div className="space-y-8">
-      {/* Card Statistik */}
       <div className="grid gap-4 sm:grid-cols-3">
         <Card className="border-0 shadow-lg">
           <CardContent className="p-4 flex items-center justify-between">
@@ -92,7 +104,6 @@ export const DashboardTab = ({ bookings, services, onBookingUpdate }: DashboardT
         </Card>
       </div>
       
-      {/* Perlu Persetujuan */}
       <Card className="border-0 shadow-lg">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -119,16 +130,16 @@ export const DashboardTab = ({ bookings, services, onBookingUpdate }: DashboardT
                           <div className="flex items-center gap-2">
                               <Button
                                 variant="destructive"
-                                size="sm"
-                                className="flex-1"
+                                size="default"
+                                className="flex-1 text-xs sm:text-sm"
                                 onClick={() => handleUpdateBookingStatus(booking.id, 'rejected')}
                               >
                                 <XCircle className="h-4 w-4 mr-2" />
                                 Tolak
                               </Button>
                               <Button
-                                size="sm"
-                                className="flex-1 bg-green-600 hover:bg-green-700"
+                                size="default"
+                                className="flex-1 bg-green-600 hover:bg-green-700 text-xs sm:text-sm"
                                 onClick={() => handleUpdateBookingStatus(booking.id, 'accepted')}
                               >
                                 <CheckCircle className="h-4 w-4 mr-2" />
@@ -148,14 +159,13 @@ export const DashboardTab = ({ bookings, services, onBookingUpdate }: DashboardT
         </CardContent>
       </Card>
       
-      {/* Pesanan Aktif */}
       <Card className="border-0 shadow-lg">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <CalendarIcon className="h-5 w-5 text-blue-600" />
             Pesanan Aktif ({activeBookings.length})
           </CardTitle>
-          <CardDescription>Daftar pesanan yang sudah Anda terima dan akan datang.</CardDescription>
+          <CardDescription>Daftar pesanan yang sudah Anda terima. Tandai selesai jika pekerjaan sudah rampung.</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
@@ -167,11 +177,22 @@ export const DashboardTab = ({ bookings, services, onBookingUpdate }: DashboardT
                                 <h4 className="font-semibold">{booking.profiles?.full_name}</h4>
                                 <p className="text-sm text-muted-foreground">{booking.services?.name}</p>
                             </div>
-                            <div className="text-left sm:text-right w-full sm:w-auto mt-2 sm:mt-0">
-                                <p className="font-semibold text-sm">
-                                    {new Date(booking.booking_date).toLocaleDateString('id-ID', {weekday: 'long', day: '2-digit', month: 'long', year: 'numeric'})}
-                                </p>
-                                <p className="text-xs text-muted-foreground">{booking.booking_time}</p>
+                            <div className="w-full sm:w-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+                                <div className="text-left sm:text-right">
+                                    <p className="font-semibold text-sm">
+                                        {new Date(booking.booking_date).toLocaleDateString('id-ID', {weekday: 'long', day: '2-digit', month: 'long'})}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">{booking.booking_time}</p>
+                                </div>
+                                {/* PERUBAHAN BARU: Tombol "Tandai Selesai" ditambahkan di sini */}
+                                <Button
+                                  size="sm"
+                                  className="bg-primary hover:bg-primary/90"
+                                  onClick={() => handleCompleteBooking(booking.id)}
+                                >
+                                  <CheckCircle className="h-4 w-4 mr-2" />
+                                  Tandai Selesai
+                                </Button>
                             </div>
                         </div>
                     </div>

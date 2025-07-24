@@ -55,3 +55,15 @@ export interface EditForm {
   bio: string;
   vehicle_availability?: 'none' | 'motorcycle' | 'car'; // Add this line
 }
+
+// **PERBAIKAN: Menambahkan interface Review yang hilang**
+export interface Review {
+  id: string;
+  rating: number;
+  review_text: string | null;
+  created_at: string;
+  profiles: { // Data dari pelanggan yang memberikan ulasan
+    full_name: string | null;
+    avatar_url: string | null;
+  } | null;
+}

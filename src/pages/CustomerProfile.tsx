@@ -1,6 +1,6 @@
 // src/pages/CustomerProfile.tsx
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,7 +15,6 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-// PERBAIKAN: Impor ArrowRight untuk tombol
 import { ArrowLeft, User, Star, MapPin, Phone, Save, CreditCard, Wallet, QrCode, PlusCircle, ShieldCheck, Clock, Calendar, Heart, Settings, BookOpen, LogOut, MessageSquare, ArrowRight } from "lucide-react";
 import MUACard, { MUAProfileForCard } from "@/components/MUACard";
 import MUACardSkeleton from "@/components/MUACardSkeleton";
@@ -84,9 +83,8 @@ const CustomerProfile = () => {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
 
-  const fetchAllData = async () => {
+  const fetchAllData = useCallback(async () => {
     if (!user) return;
-    setPageLoading(true);
     try {
       const { data: profileData, error: profileError } = await supabase.from('profiles').select('*').eq('user_id', user.id).single();
       if (profileError) throw profileError;
@@ -113,23 +111,18 @@ const CustomerProfile = () => {
     } finally {
       setPageLoading(false);
     }
-  };
+  }, [user, toast]);
 
-  const fetchFavorites = async () => {
+  const fetchFavorites = useCallback(async () => {
     if (!profile) return;
     setLoadingFavorites(true);
     try {
         const { data, error } = await supabase
             .from('favorites')
-            .select(`
-                mua_profiles (
-                    id, business_name, rating, total_reviews, location_city, specializations, cover_image_url
-                )
-            `)
+            .select(`mua_profiles (id, business_name, rating, total_reviews, location_city, specializations, cover_image_url)`)
             .eq('customer_id', profile.id);
 
         if (error) throw error;
-        
         const favoriteMUAProfiles = data.map(fav => fav.mua_profiles).filter(Boolean);
         setFavorites(favoriteMUAProfiles as MUAProfileForCard[]);
 
@@ -138,33 +131,25 @@ const CustomerProfile = () => {
     } finally {
         setLoadingFavorites(false);
     }
-  };
+  }, [profile, toast]);
 
   useEffect(() => {
-    if (user && !authLoading) {
-      fetchAllData();
-    }
-  }, [user, authLoading]);
+    if (user && !authLoading) { fetchAllData(); }
+  }, [user, authLoading, fetchAllData]);
 
   useEffect(() => {
-    if (profile) {
-      fetchFavorites();
-    }
-  }, [profile]);
+    if (profile) { fetchFavorites(); }
+  }, [profile, fetchFavorites]);
   
   useEffect(() => {
-    if (!authLoading && !user) {
-      navigate('/', { replace: true });
-    }
+    if (!authLoading && !user) { navigate('/', { replace: true }); }
   }, [user, authLoading, navigate]);
 
   const handleProfileUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profile) return;
-    
     setPageLoading(true);
     const { error } = await supabase.from('profiles').update(editForm).eq('id', profile.id);
-    
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
@@ -178,7 +163,7 @@ const CustomerProfile = () => {
     await signOut();
     navigate("/");
   };
-
+  
   const handleConversationSelect = (conversationId: string) => {
     if (isMobile) {
       navigate(`/chat/${conversationId}`);
@@ -239,6 +224,7 @@ const CustomerProfile = () => {
             <div className="overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                 <TabsList className="bg-transparent p-1 inline-flex">
                     <TabsTrigger value="riwayat" className="data-[state=active]:bg-accent data-[state=active]:text-foreground font-medium whitespace-nowrap px-4 py-2"><BookOpen className="h-4 w-4 mr-2" />Riwayat</TabsTrigger>
+                    {/* PERBAIKAN: Mengembalikan tab yang hilang */}
                     <TabsTrigger value="ulasan" className="data-[state=active]:bg-accent data-[state=active]:text-foreground font-medium whitespace-nowrap px-4 py-2"><Star className="h-4 w-4 mr-2" />Ulasan</TabsTrigger>
                     <TabsTrigger value="percakapan" className="data-[state=active]:bg-accent data-[state=active]:text-foreground font-medium whitespace-nowrap px-4 py-2"><MessageSquare className="h-4 w-4 mr-2" />Percakapan</TabsTrigger>
                     <TabsTrigger value="favorit" className="data-[state=active]:bg-accent data-[state=active]:text-foreground font-medium whitespace-nowrap px-4 py-2"><Heart className="h-4 w-4 mr-2" />Favorit</TabsTrigger>
@@ -272,7 +258,6 @@ const CustomerProfile = () => {
                                 <Badge className={`${getStatusColor(booking.status)} border`}>{booking.status}</Badge>
                                 <p className="font-bold text-lg text-primary sm:mt-1 text-right whitespace-nowrap">{formatCurrency(booking.total_price)}</p>
                               </div>
-                              {/* PERBAIKAN UTAMA: Tambahkan tombol "Lihat Invoice" */}
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -300,11 +285,45 @@ const CustomerProfile = () => {
             </Card>
           </TabsContent>
 
-          <TabsContent value="ulasan">{/* ... Konten tidak berubah ... */}</TabsContent>
-          <TabsContent value="pembayaran">{/* ... Konten tidak berubah ... */}</TabsContent>
-          <TabsContent value="percakapan"><CustomerChatList onConversationSelect={handleConversationSelect} /></TabsContent>
-          <TabsContent value="favorit">{/* ... Konten tidak berubah ... */}</TabsContent>
-          <TabsContent value="profil">{/* ... Konten tidak berubah ... */}</TabsContent>
+          {/* PERBAIKAN: Mengembalikan konten tab yang hilang */}
+          <TabsContent value="ulasan">
+            <Card className="border-0 shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 font-heading"><Star className="h-5 w-5 text-primary" />Ulasan yang Telah Anda Berikan</CardTitle>
+                <CardDescription>Review dan rating untuk MUA yang pernah Anda gunakan</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {reviews.length > 0 ? reviews.map(review => ( <Card key={review.id} className="bg-gradient-to-r from-accent/50 to-secondary/50 border-primary/20"><CardContent className="p-6"><div className="flex justify-between items-start mb-4"><div><h4 className="font-semibold text-foreground font-heading">{review.mua_profiles?.business_name || 'N/A'}</h4><p className="text-xs text-muted-foreground">{new Date(review.created_at).toLocaleDateString('id-ID')}</p></div><div className="flex items-center gap-1 bg-card rounded-full px-4 py-2 shadow-sm border border-border">{[...Array(5)].map((_, i) => (<Star key={i} className={`h-4 w-4 ${i < review.rating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}`} />))}<span className="ml-2 text-sm font-bold">{review.rating}</span></div></div>{review.review_text && (<p className="text-foreground text-sm italic leading-relaxed">"{review.review_text}"</p>)}</CardContent></Card> )) : ( <div className="text-center py-16 text-muted-foreground"><Heart className="h-16 w-16 mx-auto mb-4 opacity-50" /><p className="text-lg font-medium mb-2">Anda belum memberikan ulasan apa pun.</p><p className="text-sm">Setelah menggunakan layanan MUA, jangan lupa berikan review!</p></div> )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="percakapan">
+            <CustomerChatList onConversationSelect={handleConversationSelect} />
+          </TabsContent>
+
+          <TabsContent value="favorit">
+            <Card className="border-0 shadow-lg">
+                <CardHeader><CardTitle className="flex items-center gap-2 font-heading"><Heart className="h-5 w-5 text-primary" />MUA Favorit Anda</CardTitle><CardDescription>Daftar makeup artist yang telah Anda simpan.</CardDescription></CardHeader>
+                <CardContent>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">{loadingFavorites ? ( Array.from({ length: 2 }).map((_, index) => <MUACardSkeleton key={index} />) ) : favorites.length > 0 ? ( favorites.map(mua => ( <Link key={mua.id} to={`/mua/${mua.id}`}><MUACard {...mua} /></Link> )) ) : ( <div className="text-center py-16 text-muted-foreground col-span-2"><Heart className="h-16 w-16 mx-auto mb-4 opacity-50" /><p className="text-lg font-medium mb-2">Anda belum memiliki MUA favorit.</p><p className="text-sm">Klik ikon hati pada MUA yang Anda sukai untuk menyimpannya di sini.</p></div> )}</div>
+                </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="profil">
+            <Card className="border-0 shadow-lg">
+              <CardHeader><CardTitle className="flex items-center gap-2 font-heading"><Settings className="h-5 w-5 text-primary" />Edit Profil</CardTitle><CardDescription>Update informasi personal Anda untuk pengalaman booking yang lebih baik</CardDescription></CardHeader>
+              <CardContent>
+                <form onSubmit={handleProfileUpdate} className="space-y-8">
+                  <div className="space-y-3"><Label htmlFor="full_name" className="text-sm font-medium text-foreground">Nama Lengkap</Label><Input id="full_name" value={editForm.full_name} onChange={(e) => setEditForm({...editForm, full_name: e.target.value})} className="border-border focus:border-primary focus:ring-primary/20 h-12"/></div>
+                  <div className="space-y-3"><Label htmlFor="phone" className="text-sm font-medium text-foreground">Nomor Telepon</Label><Input id="phone" value={editForm.phone || ''} onChange={(e) => setEditForm({...editForm, phone: e.target.value})} placeholder="08XXXXXXXXXX" className="border-border focus:border-primary focus:ring-primary/20 h-12"/></div>
+                  <div className="space-y-3"><Label htmlFor="address" className="text-sm font-medium text-foreground">Alamat</Label><Textarea id="address" value={editForm.address || ''} onChange={(e) => setEditForm({...editForm, address: e.target.value})} placeholder="Alamat lengkap untuk memudahkan MUA datang ke lokasi Anda..." rows={4} className="border-border focus:border-primary focus:ring-primary/20 resize-none"/></div>
+                  <div className="flex justify-end pt-4"><Button type="submit" className="bg-primary hover:bg-primary/90 h-12 px-8 font-medium"><Save className="h-4 w-4 mr-2"/>Simpan Perubahan</Button></div>
+                </form>
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
       </div>
       {isChatOpen && activeConversationId && (
