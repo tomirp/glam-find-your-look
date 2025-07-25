@@ -47,7 +47,7 @@ const MUADetail = () => {
   const { toast } = useToast();
   const { user, role } = useAuth();
   const { setBottomNavVisible } = useBottomNav();
-  
+
   const [mua, setMua] = useState<MUAProfile | null>(null);
   const [services, setServices] = useState<Service[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -62,14 +62,21 @@ const MUADetail = () => {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
 
+  // --- INI ADALAH BAGIAN YANG DIPERBAIKI ---
+  // Logika ini menggabungkan kondisi: sembunyikan bottom nav jika modal terbuka ATAU jika layanan dipilih.
   useEffect(() => {
-    if (selectedService) {
+    if (isModalOpen || selectedService) {
       setBottomNavVisible(false);
     } else {
       setBottomNavVisible(true);
     }
-    return () => { setBottomNavVisible(true); };
-  }, [selectedService, setBottomNavVisible]);
+    // Saat komponen ini dibongkar (pengguna pindah halaman), pastikan bottom nav muncul kembali.
+    return () => {
+      setBottomNavVisible(true);
+    };
+  }, [isModalOpen, selectedService, setBottomNavVisible]);
+  // --- AKHIR DARI BAGIAN YANG DIPERBAIKI ---
+
 
   const handleSelectService = (service: Service) => {
     setSelectedService(prev => (prev?.id === service.id ? null : service));
@@ -86,7 +93,7 @@ const MUADetail = () => {
     }
     setIsModalOpen(true);
   };
-  
+
   useEffect(() => {
     if (location.state?.action === 'openBookingModal' && user && services.length > 0) {
       const { selectedServiceId } = location.state;
@@ -98,7 +105,7 @@ const MUADetail = () => {
       navigate(location.pathname, { replace: true, state: {} });
     }
   }, [location.state, user, services, navigate]);
-  
+
   useEffect(() => {
     const fetchMUADetail = async () => {
       if (!id) return;
@@ -166,8 +173,7 @@ const MUADetail = () => {
       }
     }
   };
-  
-  // PERBAIKAN UTAMA: Logika handleInitiateChat yang lebih kuat
+
   const handleInitiateChat = async () => {
     if (!user) {
       setShowLoginAlert(true);
@@ -199,7 +205,7 @@ const MUADetail = () => {
         if (existingError) throw existingError;
 
         let conversationId;
-        
+
         if (existing && existing.length > 0) {
             conversationId = existing[0].id;
         } else {
@@ -208,7 +214,7 @@ const MUADetail = () => {
                 .insert({ participant_ids: [currentUserProfileId, muaProfileId] })
                 .select('id')
                 .single();
-            
+
             if (newError) throw newError;
             if (!newConversation) throw new Error("Gagal membuat percakapan baru.");
 
@@ -275,7 +281,7 @@ const MUADetail = () => {
           <Heart className="w-32 h-32 text-red-500 fill-red-500 animate-like-popup" />
         </div>
       )}
-      
+
       <div className="min-h-screen bg-background pb-28">
         <div className="sticky top-0 z-20 bg-background/80 backdrop-blur-sm border-b">
           <div className="container mx-auto px-4 flex items-center justify-between h-16">
@@ -285,7 +291,7 @@ const MUADetail = () => {
             </div>
           </div>
         </div>
-        
+
         <div className="relative">
           <div className="absolute h-64 md:h-96 w-full">
             <img src={safeMua.cover_image_url} alt={safeMua.business_name} className="h-full w-full object-cover" />
@@ -307,7 +313,7 @@ const MUADetail = () => {
                  <Button size="lg" className="flex-1" onClick={handleBookingClick} disabled={isOwnProfile || selectedService !== null}>Pesan Sekarang</Button>
               </div>
             </div>
-            
+
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               <div className="lg:col-span-2 space-y-8">
                 <Card className="border-0 shadow-lg">
@@ -377,7 +383,7 @@ const MUADetail = () => {
           </div>
         </div>
       </div>
-      
+
       {selectedService && (
         <div className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-sm border-t z-30 shadow-[0_-4px_12px_-4px_rgba(0,0,0,0.1)]">
           <div className="container mx-auto px-4 py-3 h-[84px] flex items-center">
@@ -394,7 +400,7 @@ const MUADetail = () => {
           </div>
         </div>
       )}
-      
+
       {isModalOpen && mua && ( <BookingModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} muaData={{ id: mua.id, name: mua.business_name, location: mua.location_city, vehicle: mua.vehicle_availability }} services={services} initialServiceId={selectedService?.id} /> )}
       {!isMobile && isChatOpen && activeConversationId && ( <ChatPopup conversationId={activeConversationId} onClose={() => setIsChatOpen(false)} /> )}
     </>
