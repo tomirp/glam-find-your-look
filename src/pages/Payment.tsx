@@ -2,151 +2,241 @@
 
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/contexts/AuthContext";
-
-import Navbar from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, CreditCard, Lock } from "lucide-react";
+import { ArrowLeft, LoaderCircle, ShieldCheck, Tag, Wallet, Landmark } from "lucide-react";
+import { format } from "date-fns";
+import { Separator } from "@/components/ui/separator";
+
+// Helper
+const formatCurrency = (amount: number) => new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(amount);
+
+// Tipe Data
+type PaymentMethod = 'va-bca' | 'va-bri' | 'va-bni' | 'gopay' | 'qris';
+interface PaymentOption {
+  id: PaymentMethod;
+  name: string;
+  type: 'Virtual Account' | 'E-Wallet';
+  icon: JSX.Element;
+}
+
+// Opsi Pembayaran
+const paymentOptions: PaymentOption[] = [
+  { id: 'va-bca', name: 'BCA Virtual Account', type: 'Virtual Account', icon: <Landmark className="h-6 w-6 text-blue-600" /> },
+  { id: 'va-bri', name: 'BRI Virtual Account', type: 'Virtual Account', icon: <Landmark className="h-6 w-6 text-blue-800" /> },
+  { id: 'va-bni', name: 'BNI Virtual Account', type: 'Virtual Account', icon: <Landmark className="h-6 w-6 text-orange-600" /> },
+  { id: 'gopay', name: 'GoPay', type: 'E-Wallet', icon: <Wallet className="h-6 w-6 text-blue-500" /> },
+  { id: 'qris', name: 'QRIS', type: 'E-Wallet', icon: <Wallet className="h-6 w-6 text-sky-600" /> },
+];
 
 const Payment = () => {
-    const location = useLocation();
-    const navigate = useNavigate();
-    const { toast } = useToast();
-    const { user } = useAuth();
-    const [bookingData, setBookingData] = useState<any>(null);
-    const [paymentMethod, setPaymentMethod] = useState("credit_card");
-    const [isProcessing, setIsProcessing] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { toast } = useToast();
+  
+  const { bookingId } = location.state || {};
+  const [bookingDetails, setBookingDetails] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [selectedMethod, setSelectedMethod] = useState<PaymentMethod | undefined>();
 
-    useEffect(() => {
-        if (location.state && location.state.bookingData) {
-            setBookingData(location.state.bookingData);
-        } else {
-            toast({ title: "Error", description: "Data pemesanan tidak ditemukan.", variant: "destructive" });
-            navigate('/');
-        }
-    }, [location, navigate, toast]);
-
-    const handlePayment = async () => {
-        if (!user || !bookingData) {
-            toast({ title: "Error", description: "Sesi Anda berakhir, silakan login kembali.", variant: "destructive" });
-            navigate('/auth');
-            return;
-        }
-
-        setIsProcessing(true);
-        toast({ description: "Memproses pesanan Anda..." });
-
-        try {
-            // PERBAIKAN UTAMA: Panggil fungsi RPC `create_new_booking`
-            const { data: newBookingId, error } = await supabase
-                .rpc('create_new_booking', {
-                    p_mua_profile_id: bookingData.muaId,
-                    p_service_id: bookingData.serviceId,
-                    p_booking_date: new Date(bookingData.date).toISOString(),
-                    p_booking_time: bookingData.time,
-                    p_total_price: bookingData.totalPrice,
-                    p_platform_fee: 5000 // Contoh biaya platform
-                });
-
-            if (error) {
-                // Jika ada error dari fungsi (misalnya 'Customer profile not found'), tampilkan
-                throw error;
-            }
-            
-            toast({ title: "Berhasil!", description: "Pembayaran berhasil dan pesanan Anda telah dibuat." });
-            navigate('/confirmation', { state: { bookingId: newBookingId } });
-
-        } catch (error: any) {
-            console.error("Payment process error:", error);
-            toast({
-                title: "Gagal membuat Pesanan",
-                description: error.message,
-                variant: "destructive",
-            });
-        } finally {
-            setIsProcessing(false);
-        }
-    };
-    
-    if (!bookingData) {
-        return <div>Memuat data pemesanan...</div>;
+  useEffect(() => {
+    if (!bookingId) {
+      toast({ title: "Error", description: "Booking tidak valid.", variant: "destructive" });
+      navigate('/');
+      return;
     }
+
+    const fetchBookingDetails = async () => {
+      setLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('bookings')
+          .select(`*, services(name), mua_profiles(business_name)`)
+          .eq('id', bookingId)
+          .single();
+
+        if (error || !data) throw error || new Error("Booking tidak ditemukan.");
+        
+        setBookingDetails(data);
+      } catch (error) {
+        toast({ title: "Error", description: "Gagal memuat detail booking.", variant: "destructive" });
+        navigate('/');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchBookingDetails();
+  }, [bookingId, navigate, toast]);
+
+  const handlePayment = async () => {
+    if (!selectedMethod || !bookingDetails) return;
+
+    setIsProcessing(true);
+    toast({ description: "Memproses pembayaran Anda..." });
     
-    const formatCurrency = (amount: number) => new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(amount);
+    try {
+      const { data: paymentData, error } = await supabase
+        .from('payments')
+        .insert({
+          booking_id: bookingDetails.id,
+          customer_id: bookingDetails.customer_id,
+          amount: bookingDetails.total_price,
+          payment_method: selectedMethod,
+          payment_status: 'pending', 
+        })
+        .select()
+        .single();
+      
+      if (error) throw error;
+      
+      toast({ title: "Berhasil!", description: "Pembayaran sedang diproses." });
+      navigate(`/waiting-for-payment/${paymentData.id}`);
 
-    return (
-        <div className="min-h-screen bg-gray-50">
-            <Navbar />
-            <div className="container mx-auto max-w-2xl px-4 py-8">
-                <Button variant="ghost" onClick={() => navigate(-1)} className="mb-4">
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    Kembali ke Rincian
-                </Button>
-                <Card className="shadow-lg">
-                    <CardHeader>
-                        <CardTitle className="text-2xl">Pembayaran</CardTitle>
-                        <CardDescription>Selesaikan pembayaran untuk mengonfirmasi pesanan Anda.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                        <div className="p-4 bg-gray-100 rounded-lg">
-                            <h3 className="font-semibold">{bookingData.muaName}</h3>
-                            <p className="text-sm text-gray-600">{bookingData.service}</p>
-                            <p className="text-lg font-bold text-primary mt-2">Total: {formatCurrency(bookingData.totalPrice)}</p>
-                        </div>
+    } catch (error: any) {
+      toast({ title: "Pembayaran Gagal", description: error.message, variant: "destructive" });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
-                        <div className="space-y-2">
-                            <Label htmlFor="payment-method">Pilih Metode Pembayaran</Label>
-                            <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                                <SelectTrigger id="payment-method">
-                                    <SelectValue placeholder="Pilih cara bayar..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="credit_card">Kartu Kredit / Debit</SelectItem>
-                                    <SelectItem value="gopay">GoPay</SelectItem>
-                                    <SelectItem value="qris">QRIS</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        
-                        {paymentMethod === 'credit_card' && (
-                            <div className="space-y-4 border p-4 rounded-md">
-                                <div className="space-y-2">
-                                    <Label htmlFor="card-number">Nomor Kartu</Label>
-                                    <div className="relative">
-                                        <CreditCard className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                                        <Input id="card-number" placeholder="0000 0000 0000 0000" className="pl-10" />
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="expiry-date">Tanggal Kedaluwarsa</Label>
-                                        <Input id="expiry-date" placeholder="MM/YY" />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="cvc">CVC</Label>
-                                        <div className="relative">
-                                            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                                            <Input id="cvc" placeholder="123" className="pl-10" />
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                        
-                        <Button onClick={handlePayment} className="w-full" size="lg" disabled={isProcessing}>
-                            {isProcessing ? 'Memproses...' : `Bayar ${formatCurrency(bookingData.totalPrice)}`}
-                        </Button>
-                    </CardContent>
-                </Card>
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center">Memuat detail pembayaran...</div>;
+  }
+  if (!bookingDetails) {
+    return null;
+  }
+
+  const virtualAccounts = paymentOptions.filter(p => p.type === 'Virtual Account');
+  const eWallets = paymentOptions.filter(p => p.type === 'E-Wallet');
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="bg-white shadow-sm border-b">
+        <div className="container mx-auto max-w-6xl px-4 py-4">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div className="flex flex-col">
+              <h1 className="text-xl font-bold font-heading">Pembayaran</h1>
+              <p className="text-sm text-muted-foreground">Selesaikan pesanan Anda dalam satu langkah lagi.</p>
             </div>
+          </div>
         </div>
-    );
+      </div>
+
+      <div className="container mx-auto max-w-6xl px-4 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+          
+          <div className="lg:col-span-2 space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Landmark className="h-5 w-5 text-primary" />Virtual Account</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <RadioGroup value={selectedMethod} onValueChange={(value) => setSelectedMethod(value as PaymentMethod)}>
+                  <div className="space-y-4">
+                    {virtualAccounts.map(method => (
+                      <Label key={method.id} htmlFor={method.id} className={`flex items-center justify-between p-4 border rounded-lg cursor-pointer transition-all ${selectedMethod === method.id ? 'border-primary ring-2 ring-primary' : 'hover:bg-accent/50'}`}>
+                        <div className="flex items-center gap-4">
+                          {method.icon}
+                          <span className="font-semibold">{method.name}</span>
+                        </div>
+                        <RadioGroupItem value={method.id} id={method.id} />
+                      </Label>
+                    ))}
+                  </div>
+                </RadioGroup>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Wallet className="h-5 w-5 text-primary" />E-Wallet & QRIS</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <RadioGroup value={selectedMethod} onValueChange={(value) => setSelectedMethod(value as PaymentMethod)}>
+                  <div className="space-y-4">
+                    {eWallets.map(method => (
+                      <Label key={method.id} htmlFor={method.id} className={`flex items-center justify-between p-4 border rounded-lg cursor-pointer transition-all ${selectedMethod === method.id ? 'border-primary ring-2 ring-primary' : 'hover:bg-accent/50'}`}>
+                        <div className="flex items-center gap-4">
+                          {method.icon}
+                          <span className="font-semibold">{method.name}</span>
+                        </div>
+                        <RadioGroupItem value={method.id} id={method.id} />
+                      </Label>
+                    ))}
+                  </div>
+                </RadioGroup>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="lg:col-span-1 lg:sticky lg:top-24">
+            <Card className="shadow-lg">
+              <CardHeader>
+                <CardTitle>Ringkasan Pesanan</CardTitle>
+                <CardDescription>Periksa kembali detail pesanan Anda.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">MUA</span>
+                  <span className="font-semibold">{bookingDetails.mua_profiles.business_name}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Layanan</span>
+                  <span className="font-semibold">{bookingDetails.services.name}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Jadwal</span>
+                  {/* --- PERBAIKAN UTAMA DI SINI --- */}
+                  <span className="font-semibold text-right">
+                    {`${format(new Date(bookingDetails.booking_date), 'd MMM yyyy')}, ${bookingDetails.booking_time}`}
+                  </span>
+                </div>
+                <Separator />
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Harga Layanan</span>
+                  <span className="font-semibold">{formatCurrency(bookingDetails.total_price - (bookingDetails.platform_fee || 0))}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground flex items-center gap-1.5">
+                    <Tag className="h-4 w-4" /> Biaya Platform
+                  </span>
+                  <span className="font-semibold">{formatCurrency(bookingDetails.platform_fee || 0)}</span>
+                </div>
+                <Separator />
+                <div className="flex justify-between items-center text-lg">
+                  <span className="font-bold">Total Pembayaran</span>
+                  <span className="font-extrabold text-primary">{formatCurrency(bookingDetails.total_price)}</span>
+                </div>
+              </CardContent>
+              <CardFooter className="flex-col space-y-4">
+                <Button 
+                  size="lg" 
+                  className="w-full h-12" 
+                  onClick={handlePayment} 
+                  disabled={!selectedMethod || isProcessing}
+                >
+                  {isProcessing ? <LoaderCircle className="animate-spin h-5 w-5 mr-2" /> : <ShieldCheck className="h-5 w-5 mr-2" />}
+                  {isProcessing ? 'Memproses...' : `Bayar dengan ${selectedMethod ? paymentOptions.find(p=>p.id === selectedMethod)?.name : '...'}`}
+                </Button>
+                <p className="text-xs text-muted-foreground text-center">
+                  Dengan melanjutkan, Anda setuju dengan Syarat & Ketentuan kami.
+                </p>
+              </CardFooter>
+            </Card>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 export default Payment;
