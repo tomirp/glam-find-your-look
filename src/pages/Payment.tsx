@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -13,10 +12,8 @@ import { ArrowLeft, LoaderCircle, ShieldCheck, Tag, Wallet, Landmark } from "luc
 import { format } from "date-fns";
 import { Separator } from "@/components/ui/separator";
 
-// Helper
 const formatCurrency = (amount: number) => new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(amount);
 
-// Tipe Data
 type PaymentMethod = 'va-bca' | 'va-bri' | 'va-bni' | 'gopay' | 'qris';
 interface PaymentOption {
   id: PaymentMethod;
@@ -25,7 +22,6 @@ interface PaymentOption {
   icon: JSX.Element;
 }
 
-// Opsi Pembayaran
 const paymentOptions: PaymentOption[] = [
   { id: 'va-bca', name: 'BCA Virtual Account', type: 'Virtual Account', icon: <Landmark className="h-6 w-6 text-blue-600" /> },
   { id: 'va-bri', name: 'BRI Virtual Account', type: 'Virtual Account', icon: <Landmark className="h-6 w-6 text-blue-800" /> },
@@ -37,9 +33,8 @@ const paymentOptions: PaymentOption[] = [
 const Payment = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user } = useAuth();
   const { toast } = useToast();
-  
+
   const { bookingId } = location.state || {};
   const [bookingDetails, setBookingDetails] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -63,7 +58,7 @@ const Payment = () => {
           .single();
 
         if (error || !data) throw error || new Error("Booking tidak ditemukan.");
-        
+
         setBookingDetails(data);
       } catch (error) {
         toast({ title: "Error", description: "Gagal memuat detail booking.", variant: "destructive" });
@@ -80,7 +75,7 @@ const Payment = () => {
 
     setIsProcessing(true);
     toast({ description: "Memproses pembayaran Anda..." });
-    
+
     try {
       const { data: paymentData, error } = await supabase
         .from('payments')
@@ -89,15 +84,16 @@ const Payment = () => {
           customer_id: bookingDetails.customer_id,
           amount: bookingDetails.total_price,
           payment_method: selectedMethod,
-          payment_status: 'pending', 
+          payment_status: 'pending',
         })
         .select()
         .single();
-      
+
       if (error) throw error;
-      
+
       toast({ title: "Berhasil!", description: "Pembayaran sedang diproses." });
-      navigate(`/waiting-for-payment/${paymentData.id}`);
+      // Navigasi ke halaman tunggu dengan membawa semua data yang relevan
+      navigate(`/waiting-for-payment/${paymentData.id}`, { state: { orderData: bookingDetails, paymentData } });
 
     } catch (error: any) {
       toast({ title: "Pembayaran Gagal", description: error.message, variant: "destructive" });
@@ -118,7 +114,7 @@ const Payment = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="bg-white shadow-sm border-b">
+      <header className="bg-white shadow-sm border-b">
         <div className="container mx-auto max-w-6xl px-4 py-4">
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
@@ -126,15 +122,14 @@ const Payment = () => {
             </Button>
             <div className="flex flex-col">
               <h1 className="text-xl font-bold font-heading">Pembayaran</h1>
-              <p className="text-sm text-muted-foreground">Selesaikan pesanan Anda dalam satu langkah lagi.</p>
+              <p className="text-sm text-muted-foreground">Selesaikan pesanan Anda.</p>
             </div>
           </div>
         </div>
-      </div>
+      </header>
 
       <div className="container mx-auto max-w-6xl px-4 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-          
           <div className="lg:col-span-2 space-y-6">
             <Card>
               <CardHeader>
@@ -182,7 +177,6 @@ const Payment = () => {
             <Card className="shadow-lg">
               <CardHeader>
                 <CardTitle>Ringkasan Pesanan</CardTitle>
-                <CardDescription>Periksa kembali detail pesanan Anda.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex justify-between items-center">
@@ -193,10 +187,9 @@ const Payment = () => {
                   <span className="text-muted-foreground">Layanan</span>
                   <span className="font-semibold">{bookingDetails.services.name}</span>
                 </div>
-                <div className="flex justify-between items-center">
+                <div className="flex justify-between items-center text-right">
                   <span className="text-muted-foreground">Jadwal</span>
-                  {/* --- PERBAIKAN UTAMA DI SINI --- */}
-                  <span className="font-semibold text-right">
+                  <span className="font-semibold">
                     {`${format(new Date(bookingDetails.booking_date), 'd MMM yyyy')}, ${bookingDetails.booking_time}`}
                   </span>
                 </div>
@@ -218,10 +211,10 @@ const Payment = () => {
                 </div>
               </CardContent>
               <CardFooter className="flex-col space-y-4">
-                <Button 
-                  size="lg" 
-                  className="w-full h-12" 
-                  onClick={handlePayment} 
+                <Button
+                  size="lg"
+                  className="w-full h-12"
+                  onClick={handlePayment}
                   disabled={!selectedMethod || isProcessing}
                 >
                   {isProcessing ? <LoaderCircle className="animate-spin h-5 w-5 mr-2" /> : <ShieldCheck className="h-5 w-5 mr-2" />}

@@ -15,14 +15,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { ArrowLeft, User, Phone, MapPin, Calendar, Clock, Palette, Car, Bike, Tag, ShieldCheck, LoaderCircle } from "lucide-react";
+import { ArrowLeft, Car, Bike, Tag, ShieldCheck, LoaderCircle, Palette, Calendar as CalendarIcon, Clock } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const formatCurrency = (amount: number) => new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(amount);
-
-interface UserProfile {
-  id: string;
-}
 
 type TransportOption = 'private' | 'online';
 
@@ -33,27 +29,28 @@ const Checkout = () => {
   const { toast } = useToast();
 
   const { bookingData } = location.state || {};
-  
+
   const [profileId, setProfileId] = useState<string | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [customerNotes, setCustomerNotes] = useState('');
-  const [transportChoice, setTransportChoice] = useState<TransportOption>('online');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [platformFee] = useState(5000); 
-  const [transportFee] = useState(25000); 
+  // Fee dari platform dan transportasi
+  const PLATFORM_FEE = 5000;
+  const TRANSPORT_FEE = 25000;
 
   useEffect(() => {
-    // Fungsi ini sekarang hanya mengambil ID profil, bukan seluruh data diri
+    if (!bookingData) {
+      toast({ title: "Sesi Tidak Valid", description: "Data pemesanan tidak ditemukan.", variant: "destructive" });
+      navigate('/');
+      return;
+    }
+
     const fetchUserProfileId = async () => {
       if (user) {
         setLoadingProfile(true);
         try {
-          const { data, error } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('user_id', user.id)
-            .single();
+          const { data, error } = await supabase.from('profiles').select('id').eq('user_id', user.id).single();
           if (error) throw error;
           if (data) {
             setProfileId(data.id);
@@ -67,32 +64,19 @@ const Checkout = () => {
           setLoadingProfile(false);
         }
       } else {
-        setLoadingProfile(false); 
+        setLoadingProfile(false);
       }
     };
     fetchUserProfileId();
-  }, [user, toast, navigate]);
+  }, [user, bookingData, toast, navigate]);
 
-  useEffect(() => {
-    if (!bookingData) {
-      toast({ title: "Sesi Tidak Valid", description: "Data pemesanan tidak ditemukan.", variant: "destructive" });
-      navigate('/');
-    }
-  }, [bookingData, navigate, toast]);
-
-  const TransportIcon = useMemo(() => {
-    if (bookingData?.vehicle === 'car') return <Car className="h-5 w-5 text-primary" />;
-    if (bookingData?.vehicle === 'motorcycle') return <Bike className="h-5 w-5 text-primary" />;
-    return null;
-  }, [bookingData?.vehicle]);
 
   if (!bookingData) {
     return <div className="min-h-screen flex items-center justify-center">Mengalihkan...</div>;
   }
-  
+
   const servicePrice = Number(bookingData.price) || 0;
-  const usePrivateTransport = transportChoice === 'private' && bookingData.vehicle !== 'none';
-  const finalPrice = servicePrice + platformFee + (usePrivateTransport ? transportFee : 0);
+  const totalPrice = servicePrice + PLATFORM_FEE;
 
   const handleConfirmAndPay = async () => {
     if (!user || !profileId) {
@@ -104,42 +88,29 @@ const Checkout = () => {
     toast({ description: "Membuat pesanan Anda..." });
 
     try {
-      // --- PERBAIKAN UTAMA: Objek data yang dikirim kini 100% sesuai dengan asumsi skema yang paling logis ---
-      const bookingInsertData = {
-        mua_profile_id: bookingData.muaId,
-        customer_id: profileId, // Kunci utama untuk merujuk ke data pelanggan
-        service_id: bookingData.serviceId,
-        booking_date: new Date(bookingData.date).toISOString().slice(0, 10),
-        booking_time: bookingData.time,
-        customer_notes: customerNotes,
-        price: servicePrice,
-        platform_fee: platformFee,
-        transport_fee: usePrivateTransport ? transportFee : 0,
-        total_price: finalPrice,
-        status: 'pending' as const,
-        use_own_vehicle: usePrivateTransport,
-        // Kolom 'customer_name', 'customer_phone', dan 'customer_address' tidak lagi dikirim
-      };
-
       const { data, error } = await supabase
-        .from('bookings')
-        .insert(bookingInsertData)
-        .select('id')
-        .single();
-      
+        .rpc('create_new_booking', {
+            p_mua_profile_id: bookingData.muaId,
+            p_service_id: bookingData.serviceId,
+            p_booking_date: new Date(bookingData.date).toISOString().slice(0, 10),
+            p_booking_time: bookingData.time,
+            p_total_price: totalPrice,
+            p_platform_fee: PLATFORM_FEE
+        });
+
       if (error) {
-        console.error("Supabase Insert Error:", error);
+        console.error("Supabase RPC Error:", error);
         throw new Error(error.message);
       }
-      if (!data || !data.id) {
+      if (!data) {
         throw new Error("Gagal mendapatkan ID booking setelah pembuatan.");
       }
-      
+
       toast({ title: "Pesanan Dibuat!", description: "Anda akan diarahkan ke halaman pembayaran." });
-      navigate('/payment', { state: { bookingId: data.id }, replace: true });
+      navigate('/payment', { state: { bookingId: data }, replace: true });
 
     } catch (error: any) {
-      toast({ title: "Gagal Membuat Pesanan", description: "Terjadi kesalahan internal. Coba lagi nanti.", variant: "destructive" });
+      toast({ title: "Gagal Membuat Pesanan", description: "Terjadi kesalahan. Coba lagi nanti.", variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
@@ -147,7 +118,7 @@ const Checkout = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="bg-white shadow-sm border-b">
+      <header className="bg-white shadow-sm border-b">
         <div className="container mx-auto max-w-6xl px-4 py-4">
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="icon" onClick={() => navigate(-1)}><ArrowLeft className="h-5 w-5" /></Button>
@@ -157,7 +128,7 @@ const Checkout = () => {
             </div>
           </div>
         </div>
-      </div>
+      </header>
       <div className="container mx-auto max-w-6xl px-4 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
           <div className="lg:col-span-2 space-y-8">
@@ -171,14 +142,14 @@ const Checkout = () => {
               </CardHeader>
               <CardContent className="space-y-4 pt-4">
                 <div className="flex items-center gap-4 text-sm"><Palette className="h-5 w-5 text-primary" /><span className="font-semibold">{bookingData.serviceName}</span></div>
-                <div className="flex items-center gap-4 text-sm"><Calendar className="h-5 w-5 text-primary" /><span className="font-semibold">{format(new Date(bookingData.date), 'EEEE, d MMMM yyyy', { locale: indonesiaLocale })}</span></div>
+                <div className="flex items-center gap-4 text-sm"><CalendarIcon className="h-5 w-5 text-primary" /><span className="font-semibold">{format(new Date(bookingData.date), 'EEEE, d MMMM yyyy', { locale: indonesiaLocale })}</span></div>
                 <div className="flex items-center gap-4 text-sm"><Clock className="h-5 w-5 text-primary" /><span className="font-semibold">{bookingData.time}</span></div>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle>Catatan untuk MUA</CardTitle>
+                <CardTitle>Catatan untuk MUA (Opsional)</CardTitle>
                 <CardDescription>Beri tahu MUA jika ada preferensi atau kondisi khusus.</CardDescription>
               </CardHeader>
               <CardContent>
@@ -191,36 +162,12 @@ const Checkout = () => {
             <Card className="shadow-lg">
               <CardHeader> <CardTitle>Ringkasan Biaya</CardTitle> </CardHeader>
               <CardContent className="space-y-4">
-                {bookingData.vehicle !== 'none' && (
-                  <div className="space-y-4">
-                    <Label className="font-semibold">Opsi Transportasi MUA</Label>
-                    <RadioGroup value={transportChoice} onValueChange={(v) => setTransportChoice(v as TransportOption)}>
-                      <Label className="flex items-start gap-4 p-3 border rounded-md has-[:checked]:border-primary">
-                        <RadioGroupItem value="private" id="private" className="mt-1" />
-                        <div className="flex flex-col">
-                          <span className="flex items-center gap-2">{TransportIcon}Kendaraan Pribadi MUA</span>
-                          <span className="text-xs text-muted-foreground">Biaya tambahan berlaku.</span>
-                        </div>
-                      </Label>
-                      <Label className="flex items-start gap-4 p-3 border rounded-md has-[:checked]:border-primary">
-                        <RadioGroupItem value="online" id="online" className="mt-1" />
-                        <div className="flex flex-col">
-                          <span>Transport Online</span>
-                          <span className="text-xs text-muted-foreground">Anda memesan dan menanggung biaya.</span>
-                        </div>
-                      </Label>
-                    </RadioGroup>
-                  </div>
-                )}
                 <div className="flex justify-between items-center"><span className="text-muted-foreground">Harga Layanan</span><span className="font-semibold">{formatCurrency(servicePrice)}</span></div>
-                <div className="flex justify-between items-center"><span className="text-muted-foreground flex items-center gap-1.5"><Tag className="h-4 w-4" /> Biaya Platform</span><span className="font-semibold">{formatCurrency(platformFee)}</span></div>
-                {usePrivateTransport && (
-                  <div className="flex justify-between items-center"><span className="text-muted-foreground">Biaya Transportasi</span><span className="font-semibold">{formatCurrency(transportFee)}</span></div>
-                )}
+                <div className="flex justify-between items-center"><span className="text-muted-foreground flex items-center gap-1.5"><Tag className="h-4 w-4" /> Biaya Platform</span><span className="font-semibold">{formatCurrency(PLATFORM_FEE)}</span></div>
                 <Separator />
                 <div className="flex justify-between items-center text-lg">
                   <span className="font-bold">Total</span>
-                  <span className="font-extrabold text-primary">{formatCurrency(finalPrice)}</span>
+                  <span className="font-extrabold text-primary">{formatCurrency(totalPrice)}</span>
                 </div>
               </CardContent>
               <CardFooter>
