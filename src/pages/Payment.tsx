@@ -77,23 +77,25 @@ const Payment = () => {
     toast({ description: "Memproses pembayaran Anda..." });
 
     try {
-      const { data: paymentData, error } = await supabase
-        .from('payments')
-        .insert({
-          booking_id: bookingDetails.id,
-          customer_id: bookingDetails.customer_id,
-          amount: bookingDetails.total_price,
-          payment_method: selectedMethod,
-          payment_status: 'pending',
-        })
-        .select()
-        .single();
+        // PERBAIKAN UTAMA: Gunakan 'upsert' untuk menghindari duplikasi
+        const { data: paymentData, error } = await supabase
+            .from('payments')
+            .upsert({
+                booking_id: bookingDetails.id,
+                customer_id: bookingDetails.customer_id,
+                amount: bookingDetails.total_price,
+                payment_method: selectedMethod,
+                payment_status: 'pending',
+            }, {
+                onConflict: 'booking_id', // Kolom unik untuk deteksi konflik
+            })
+            .select()
+            .single(); // Ambil data yang berhasil di-upsert
 
-      if (error) throw error;
-
-      toast({ title: "Berhasil!", description: "Pembayaran sedang diproses." });
-      // Navigasi ke halaman tunggu dengan membawa semua data yang relevan
-      navigate(`/waiting-for-payment/${paymentData.id}`, { state: { orderData: bookingDetails, paymentData } });
+        if (error) throw error;
+        
+        toast({ title: "Berhasil!", description: "Anda akan diarahkan ke halaman instruksi." });
+        navigate(`/waiting-for-payment/${paymentData.id}`, { state: { orderData: bookingDetails, paymentData } });
 
     } catch (error: any) {
       toast({ title: "Pembayaran Gagal", description: error.message, variant: "destructive" });
