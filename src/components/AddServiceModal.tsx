@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { PlusCircle, Upload, Save } from "lucide-react";
+import { PlusCircle, Upload, Save, LoaderCircle } from "lucide-react"; // Pastikan LoaderCircle diimpor
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -96,7 +96,6 @@ const AddServiceModal = ({ muaProfileId, onServiceAdded }: AddServiceModalProps)
       </Button>
       
       <Dialog open={open} onOpenChange={setOpen}>
-        {/* PERBAIKAN: DialogContent sekarang berada di dalam form */}
         <form onSubmit={handleSubmit}>
           <DialogContent onOpenAutoFocus={(e) => e.preventDefault()} className="max-w-3xl">
             <DialogHeader>
@@ -108,54 +107,23 @@ const AddServiceModal = ({ muaProfileId, onServiceAdded }: AddServiceModalProps)
                 <div className="flex-1 space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="name">Nama Layanan</Label>
-                    <Input 
-                      id="name" 
-                      name="name" 
-                      value={newService.name} 
-                      onChange={handleServiceChange} 
-                      placeholder="contoh: Makeup Wisuda" 
-                      required 
-                    />
+                    <Input id="name" name="name" value={newService.name} onChange={handleServiceChange} placeholder="contoh: Makeup Wisuda" required />
                   </div>
-                  
                   <div className="space-y-2">
                     <Label htmlFor="description">Deskripsi</Label>
-                    <Textarea 
-                      id="description" 
-                      name="description" 
-                      value={newService.description} 
-                      onChange={handleServiceChange} 
-                      placeholder="Deskripsi layanan..." 
-                      required 
-                    />
+                    <Textarea id="description" name="description" value={newService.description} onChange={handleServiceChange} placeholder="Deskripsi layanan..." required />
                   </div>
-                  
                   <div className="flex gap-4">
                     <div className="space-y-2 w-1/2">
                       <Label htmlFor="price_min">Harga (Rp)</Label>
-                      <Input 
-                        id="price_min" 
-                        name="price_min" 
-                        type="number" 
-                        value={newService.price_min} 
-                        onChange={handleServiceChange} 
-                        required 
-                      />
+                      <Input id="price_min" name="price_min" type="number" value={newService.price_min} onChange={handleServiceChange} required />
                     </div>
                     <div className="space-y-2 w-1/2">
                       <Label htmlFor="duration_minutes">Durasi (menit)</Label>
-                      <Input 
-                        id="duration_minutes" 
-                        name="duration_minutes" 
-                        type="number" 
-                        value={newService.duration_minutes} 
-                        onChange={handleServiceChange} 
-                        required 
-                      />
+                      <Input id="duration_minutes" name="duration_minutes" type="number" value={newService.duration_minutes} onChange={handleServiceChange} required />
                     </div>
                   </div>
                 </div>
-                
                 <div className="flex-1">
                   <Label>Foto Layanan</Label>
                   <div className="mt-2 aspect-video border-2 border-dashed border-border rounded-lg flex items-center justify-center bg-card">
@@ -168,24 +136,23 @@ const AddServiceModal = ({ muaProfileId, onServiceAdded }: AddServiceModalProps)
                       </div>
                     )}
                   </div>
-                  <Input 
-                    type="file" 
-                    className="mt-2" 
-                    accept="image/*" 
-                    onChange={handleFileSelect} 
-                    required 
-                  />
+                  <Input type="file" className="mt-2" accept="image/*" onChange={handleFileSelect} required />
                 </div>
               </div>
             </div>
             
+            {/* --- PERBAIKAN UTAMA PADA TOMBOL --- */}
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                 Batal
               </Button>
               <Button type="submit" disabled={isAddingService} className="bg-primary hover:bg-primary/90">
+                {isAddingService ? (
+                  <LoaderCircle className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4 mr-2" />
+                )}
                 {isAddingService ? "Menyimpan..." : "Simpan Layanan"}
-                <Save className="h-4 w-4 ml-2" />
               </Button>
             </DialogFooter>
           </DialogContent>

@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, User, Star, MapPin, Phone, Save, CreditCard, Wallet, QrCode, PlusCircle, ShieldCheck, Clock, Calendar, Heart, Settings, BookOpen, LogOut, MessageSquare, ArrowRight } from "lucide-react";
+import { ArrowLeft, User, Star, MapPin, Phone, Save, CreditCard, Wallet, QrCode, PlusCircle, ShieldCheck, Clock, Calendar, Heart, Settings, BookOpen, LogOut, MessageSquare, ArrowRight, LoaderCircle } from "lucide-react"; // 1. Impor LoaderCircle
 import MUACard, { MUAProfileForCard } from "@/components/MUACard";
 import MUACardSkeleton from "@/components/MUACardSkeleton";
 import { SearchingReplacementCard } from "@/components/SearchingReplacementCard";
@@ -78,6 +78,7 @@ const CustomerProfile = () => {
   const [favorites, setFavorites] = useState<MUAProfileForCard[]>([]);
   const [loadingFavorites, setLoadingFavorites] = useState(true);
   const [pageLoading, setPageLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false); // 2. State baru untuk tombol simpan
   const [editForm, setEditForm] = useState({ full_name: "", phone: "", address: "" });
 
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -91,12 +92,7 @@ const CustomerProfile = () => {
       setProfile(profileData);
       setEditForm({ full_name: profileData.full_name || '', phone: profileData.phone || '', address: profileData.address || ''});
 
-      const { data: bookingsData, error: bookingError } = await supabase
-        .from('bookings')
-        .select(`*, mua_profiles(business_name), services(name), payments!left(payment_status)`)
-        .eq('customer_id', profileData.id)
-        .order('booking_date', { ascending: false });
-        
+      const { data: bookingsData, error: bookingError } = await supabase.from('bookings').select(`*, mua_profiles(business_name), services(name), payments!left(payment_status)`).eq('customer_id', profileData.id).order('booking_date', { ascending: false });
       if(bookingError) throw bookingError;
       const typedBookings = bookingsData.map(b => ({...b, payments: Array.isArray(b.payments) ? b.payments[0] : b.payments})) as Booking[];
       setBookings(typedBookings);
@@ -117,15 +113,10 @@ const CustomerProfile = () => {
     if (!profile) return;
     setLoadingFavorites(true);
     try {
-        const { data, error } = await supabase
-            .from('favorites')
-            .select(`mua_profiles (id, business_name, rating, total_reviews, location_city, specializations, cover_image_url)`)
-            .eq('customer_id', profile.id);
-
+        const { data, error } = await supabase.from('favorites').select(`mua_profiles (id, business_name, rating, total_reviews, location_city, specializations, cover_image_url)`).eq('customer_id', profile.id);
         if (error) throw error;
         const favoriteMUAProfiles = data.map(fav => fav.mua_profiles).filter(Boolean);
         setFavorites(favoriteMUAProfiles as MUAProfileForCard[]);
-
     } catch (error: any) {
         toast({ title: "Error", description: "Gagal memuat MUA favorit.", variant: "destructive" });
     } finally {
@@ -148,20 +139,24 @@ const CustomerProfile = () => {
   const handleProfileUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profile) return;
-    setPageLoading(true);
-    const { error } = await supabase.from('profiles').update(editForm).eq('id', profile.id);
-    if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    } else {
-      toast({ title: "Berhasil!", description: "Profil Anda telah diperbarui." });
-      await fetchAllData();
+    setIsSaving(true); // 3. Mulai loading
+    try {
+        const { error } = await supabase.from('profiles').update(editForm).eq('id', profile.id);
+        if (error) {
+          toast({ title: "Error", description: error.message, variant: "destructive" });
+        } else {
+          toast({ title: "Berhasil!", description: "Profil Anda telah diperbarui." });
+          await fetchAllData();
+        }
+    } catch(error: any) {
+        toast({ title: "Error", description: "Terjadi kesalahan saat menyimpan.", variant: "destructive" });
+    } finally {
+        setIsSaving(false); // 4. Selesai loading
     }
-    setPageLoading(false);
   };
 
   const handleSignOut = async () => {
     await signOut();
-    // PERBAIKAN: Menambahkan notifikasi toast setelah berhasil logout
     toast({
       title: "Berhasil!",
       description: "Anda telah keluar dari akun Anda.",
@@ -254,15 +249,7 @@ const CustomerProfile = () => {
                             <Badge className={`${getStatusColor(booking.status)} border`}>{booking.status}</Badge>
                             <p className="font-bold text-lg text-primary sm:mt-1 text-right whitespace-nowrap">{formatCurrency(booking.total_price)}</p>
                           </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => navigate('/confirmation', { state: { bookingId: booking.id } })}
-                            className="w-full sm:w-auto"
-                          >
-                            Lihat Invoice
-                            <ArrowRight className="h-4 w-4 ml-2" />
-                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => navigate('/confirmation', { state: { bookingId: booking.id } })} className="w-full sm:w-auto">Lihat Invoice <ArrowRight className="h-4 w-4 ml-2" /></Button>
                         </div>
                       </div>
                     </div>
@@ -301,7 +288,19 @@ const CustomerProfile = () => {
                   <div className="space-y-2"><Label htmlFor="full_name">Nama Lengkap</Label><Input id="full_name" value={editForm.full_name} onChange={(e) => setEditForm({...editForm, full_name: e.target.value})} className="h-12"/></div>
                   <div className="space-y-2"><Label htmlFor="phone">Nomor Telepon</Label><Input id="phone" value={editForm.phone || ''} onChange={(e) => setEditForm({...editForm, phone: e.target.value})} placeholder="08XXXXXXXXXX" className="h-12"/></div>
                   <div className="space-y-2"><Label htmlFor="address">Alamat</Label><Textarea id="address" value={editForm.address || ''} onChange={(e) => setEditForm({...editForm, address: e.target.value})} placeholder="Alamat lengkap Anda..." rows={4} className="resize-none"/></div>
-                  <div className="flex justify-end pt-2"><Button type="submit" className="h-12 px-8"><Save className="h-4 w-4 mr-2"/>Simpan Perubahan</Button></div>
+                  
+                  {/* --- PERBAIKAN UTAMA PADA TOMBOL --- */}
+                  <div className="flex justify-end pt-2">
+                    <Button type="submit" className="h-12 px-8" disabled={isSaving}>
+                      {isSaving ? (
+                        <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Save className="h-4 w-4 mr-2"/>
+                      )}
+                      {isSaving ? "Menyimpan..." : "Simpan Perubahan"}
+                    </Button>
+                  </div>
+                  
                 </form>
               </CardContent>
             </Card>
