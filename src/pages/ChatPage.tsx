@@ -1,124 +1,147 @@
 // src/pages/ChatPage.tsx
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { ArrowLeft } from 'lucide-react';
-import ChatInput from '@/components/ChatInput';
-import ChatMessage from '@/components/ChatMessage';
-import { Skeleton } from '@/components/ui/skeleton';
-
-interface Message {
-  id: number;
-  content: string;
-  sender_id: string;
-  created_at: string;
-}
+import { useToast } from '@/hooks/use-toast';
+import { Button } from '@/components/ui/button';
+import { ArrowLeft, LoaderCircle } from 'lucide-react';
+import { ChatInput } from '@/components/ChatInput'; // 1. Impor yang benar
+import { ChatMessage } from '@/components/ChatMessage'; // 2. Impor yang benar
 
 const ChatPage = () => {
   const { conversationId } = useParams<{ conversationId: string }>();
-  const navigate = useNavigate();
   const { user } = useAuth();
-  const [messages, setMessages] = useState<Message[]>([]);
+  const { toast } = useToast();
+  const navigate = useNavigate();
+
+  const [messages, setMessages] = useState<any[]>([]);
+  const [otherParticipant, setOtherParticipant] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [profileId, setProfileId] = useState<string | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [isSending, setIsSending] = useState(false); // 3. State untuk loading kirim pesan
 
   useEffect(() => {
-    const fetchProfileAndMessages = async () => {
-      if (!user || !conversationId) return;
+    if (!conversationId || !user) {
+      navigate('/');
+      return;
+    }
 
-      const { data: profile } = await supabase.from('profiles').select('id').eq('user_id', user.id).single();
-      if (profile) setProfileId(profile.id);
+    const fetchConversationDetails = async () => {
+      setLoading(true);
+      try {
+        // Ambil info percakapan
+        const { data: convData, error: convError } = await supabase
+          .from('conversations')
+          .select('participant_ids')
+          .eq('id', conversationId)
+          .single();
 
-      const { data, error } = await supabase
-        .from('messages')
-        .select('*')
-        .eq('conversation_id', conversationId)
-        .order('created_at', { ascending: true });
+        if (convError) throw convError;
 
-      if (!error) setMessages(data);
-      setLoading(false);
+        const otherUserId = convData.participant_ids.find((id: string) => id !== user.id);
+        if (otherUserId) {
+          const { data: profileData } = await supabase.from('profiles').select('*').eq('id', otherUserId).single();
+          setOtherParticipant(profileData);
+        }
+
+        // Ambil pesan
+        const { data: messagesData, error: messagesError } = await supabase
+          .from('messages')
+          .select('*, profiles(full_name, avatar_url)')
+          .eq('conversation_id', conversationId)
+          .order('created_at', { ascending: true });
+        
+        if (messagesError) throw messagesError;
+        setMessages(messagesData || []);
+
+      } catch (error: any) {
+        toast({ title: "Error", description: `Gagal memuat chat: ${error.message}`, variant: "destructive" });
+      } finally {
+        setLoading(false);
+      }
     };
-    fetchProfileAndMessages();
-  }, [user, conversationId]);
 
-  useEffect(() => {
-    const channel = supabase
+    fetchConversationDetails();
+
+    // Setup listener untuk pesan baru (realtime)
+    const subscription = supabase
       .channel(`chat:${conversationId}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${conversationId}` },
         (payload) => {
-          setMessages((prev) => [...prev, payload.new as Message]);
+          const fetchNewMessageWithProfile = async () => {
+            const { data } = await supabase.from('messages').select('*, profiles(full_name, avatar_url)').eq('id', payload.new.id).single();
+            if (data) setMessages((prev) => [...prev, data]);
+          };
+          fetchNewMessageWithProfile();
         }
       )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(subscription);
     };
-  }, [conversationId]);
 
-  useEffect(() => {
-    setTimeout(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, 100);
-  }, [messages]);
+  }, [conversationId, user, navigate, toast]);
 
-  const handleSendMessage = async (content: string) => {
-    if (!profileId || !conversationId) return;
-    await supabase.from('messages').insert({ content, conversation_id: conversationId, sender_id: profileId });
+  // --- INI ADALAH LOGIKA PENGIRIMAN GAMBAR YANG BARU ---
+  const handleSendMessage = async (content: string, file?: File) => {
+    if (!user || (!content.trim() && !file)) return;
+
+    setIsSending(true);
+    let imageUrl: string | null = null;
+
+    try {
+      // Langkah A: Jika ada file, unggah terlebih dahulu
+      if (file) {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Date.now()}.${fileExt}`;
+        // Path file dibuat unik untuk setiap percakapan
+        const filePath = `${conversationId}/${fileName}`;
+        
+        const { error: uploadError } = await supabase.storage.from('chat_images').upload(filePath, file);
+        if (uploadError) throw uploadError;
+
+        const { data: urlData } = supabase.storage.from('chat_images').getPublicUrl(filePath);
+        imageUrl = urlData.publicUrl;
+      }
+
+      // Langkah B: Simpan pesan ke database (termasuk URL gambar jika ada)
+      const { error: insertError } = await supabase.from('messages').insert({
+        conversation_id: conversationId,
+        sender_id: user.id,
+        content: content,
+        image_url: imageUrl, // Simpan URL gambar di sini
+      });
+
+      if (insertError) throw insertError;
+
+    } catch (error: any) {
+      toast({ title: "Gagal Mengirim Pesan", description: error.message, variant: "destructive" });
+    } finally {
+      setIsSending(false);
+    }
   };
 
   if (loading) {
-      return (
-        <div className="flex flex-col h-screen bg-background">
-            <header className="flex items-center p-4 border-b">
-                <Skeleton className="h-6 w-6 rounded-full" />
-                <Skeleton className="h-6 w-24 ml-4" />
-            </header>
-            <main className="flex-1 p-4 space-y-4">
-                <Skeleton className="h-10 w-3/5 rounded-lg" />
-                <div className="flex justify-end">
-                    <Skeleton className="h-12 w-2/5 rounded-lg" />
-                </div>
-                <Skeleton className="h-8 w-1/2 rounded-lg" />
-            </main>
-            <div className="p-2 border-t">
-                <Skeleton className="h-10 w-full rounded-lg" />
-            </div>
-        </div>
-      );
+    return <div className="min-h-screen flex items-center justify-center"><LoaderCircle className="h-8 w-8 animate-spin text-primary" /></div>;
   }
 
   return (
-    // PERBAIKAN UTAMA: Struktur layout baru
-    <div className="relative h-screen bg-background">
-      {/* Header diposisikan fixed di atas */}
-      <header className="fixed top-0 left-0 right-0 flex items-center p-4 border-b bg-background/80 backdrop-blur-sm z-10 h-16">
-        <button onClick={() => navigate(-1)} className="p-2 -ml-2">
-          <ArrowLeft className="h-6 w-6" />
-        </button>
-        <h1 className="text-lg font-semibold ml-4">Chat</h1>
+    <div className="flex flex-col h-screen">
+      <header className="flex items-center p-4 border-b bg-background sticky top-0 z-10">
+        <Button variant="ghost" size="icon" className="mr-4" onClick={() => navigate(-1)}>
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
+        <h2 className="text-lg font-semibold">{otherParticipant?.business_name || otherParticipant?.full_name || 'Chat'}</h2>
       </header>
-
-      {/* Area Pesan diberi padding atas & bawah agar tidak tertutup header/input */}
-      <main className="overflow-y-auto h-full pt-20 pb-16 px-4 space-y-4">
-        {messages.map((msg) => (
-          <ChatMessage
-            key={msg.id}
-            content={msg.content}
-            isMine={msg.sender_id === profileId}
-            timestamp={msg.created_at}
-          />
-        ))}
-        <div ref={messagesEndRef} />
+      <main className="flex-grow overflow-y-auto">
+        <ChatMessage messages={messages} currentUserId={user?.id || ''} />
       </main>
-      
-      {/* Input diposisikan fixed di bawah */}
-      <div className="fixed bottom-0 left-0 right-0 bg-background z-10">
-        <ChatInput onSendMessage={handleSendMessage} />
-      </div>
+      <footer className="sticky bottom-0">
+        {/* 4. Berikan prop 'isSending' ke ChatInput */}
+        <ChatInput onSendMessage={handleSendMessage} isSending={isSending} />
+      </footer>
     </div>
   );
 };
