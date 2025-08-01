@@ -26,6 +26,8 @@ import ChatPage from "./pages/ChatPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 import BottomNav from "./components/BottomNav";
 import LeaveReview from "./pages/LeaveReview";
+import AuthHandler from "./components/AuthHandler";
+import Navbar from "./components/Navbar";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { refetchOnWindowFocus: false } },
@@ -50,6 +52,8 @@ const AppLayout = () => {
 
   return (
     <>
+      <Navbar />
+      <AuthHandler />
       <Routes>
         <Route path="/" element={<Index />} />
         <Route path="/auth" element={<Auth />} />
@@ -57,6 +61,7 @@ const AppLayout = () => {
         <Route path="/mua/:id" element={<MUADetail />} />
         <Route element={<ProtectedRoute allowedRoles={['mua']} />}>
           <Route path="/mua/profile" element={<MUAProfile />} />
+          <Route path="/mua/dashboard" element={<MUAProfile />} />
           <Route path="/mua/onboarding" element={<MUAOnboarding />} />
         </Route>
         <Route element={<ProtectedRoute allowedRoles={['customer']} />}>

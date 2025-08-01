@@ -8,7 +8,7 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute = ({ allowedRoles }: ProtectedRouteProps) => {
-  const { role, loading, user } = useAuth();
+  const { role, loading, user, setLoginRedirect } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -26,11 +26,13 @@ const ProtectedRoute = ({ allowedRoles }: ProtectedRouteProps) => {
 
   // Jika pengguna sudah diotorisasi, tampilkan halaman yang diminta.
   // Jika tidak, arahkan ke halaman login sambil menyimpan halaman tujuan mereka.
-  return isAuthorized ? (
-    <Outlet />
-  ) : (
-    <Navigate to="/auth" state={{ from: location }} replace />
-  );
+  if (isAuthorized) {
+    return <Outlet />;
+  }
+
+  // Simpan redirect location dan arahkan ke auth
+  setLoginRedirect({ pathname: location.pathname, state: location.state });
+  return <Navigate to="/auth" replace />;
 };
 
 export default ProtectedRoute;
