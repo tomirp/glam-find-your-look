@@ -34,6 +34,11 @@ const AuthHandler = () => {
           console.log(`[AuthHandler] MUA detected. Redirecting to dashboard...`);
           navigate('/mua/dashboard', { replace: true });
         }
+        // If MUA has profile and is on root page, suggest dashboard
+        else if (muaProfileExists === true && location.pathname === '/' && role === 'mua') {
+          console.log(`[AuthHandler] MUA on homepage. Could redirect to dashboard...`);
+          // Optional: Auto redirect or show dashboard link
+        }
       }
       // Customer specific routing
       else if (role === 'customer' && location.pathname === '/auth') {

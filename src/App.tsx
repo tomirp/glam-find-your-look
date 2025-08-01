@@ -28,6 +28,7 @@ import BottomNav from "./components/BottomNav";
 import LeaveReview from "./pages/LeaveReview";
 import AuthHandler from "./components/AuthHandler";
 import Navbar from "./components/Navbar";
+import MUADashboard from "./pages/MUADashboard";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { refetchOnWindowFocus: false } },
@@ -61,7 +62,7 @@ const AppLayout = () => {
         <Route path="/mua/:id" element={<MUADetail />} />
         <Route element={<ProtectedRoute allowedRoles={['mua']} />}>
           <Route path="/mua/profile" element={<MUAProfile />} />
-          <Route path="/mua/dashboard" element={<MUAProfile />} />
+          <Route path="/mua/dashboard" element={<MUADashboard />} />
           <Route path="/mua/onboarding" element={<MUAOnboarding />} />
         </Route>
         <Route element={<ProtectedRoute allowedRoles={['customer']} />}>

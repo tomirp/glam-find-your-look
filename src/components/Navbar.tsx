@@ -24,7 +24,7 @@ const Navbar = () => {
     navigate('/');
   };
 
-  const profileLink = role === 'mua' ? '/mua/profile' : '/customer/profile';
+  const profileLink = role === 'mua' ? '/mua/dashboard' : '/customer/profile';
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
