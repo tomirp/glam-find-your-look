@@ -2,6 +2,7 @@
 
 import { useAuth } from "@/contexts/AuthContext";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
+import { LoadingSpinner } from "./LoadingSpinner";
 
 interface ProtectedRouteProps {
   allowedRoles: Array<'mua' | 'customer'>;
@@ -13,9 +14,9 @@ const ProtectedRoute = ({ allowedRoles }: ProtectedRouteProps) => {
 
   if (loading) {
     return (
-        <div className="min-h-screen flex items-center justify-center">
-            <div>Memuat...</div>
-        </div>
+      <div className="min-h-screen flex items-center justify-center">
+        <LoadingSpinner size="lg" />
+      </div>
     );
   }
 
