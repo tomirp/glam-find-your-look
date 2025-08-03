@@ -1,4 +1,4 @@
-import Navbar from "@/components/Navbar";
+//import Navbar from "@/components/Navbar"; //<--hapus saja ini
 import SearchSection from "@/components/SearchSection";
 import HeroSection from "@/components/HeroSection";
 import BrandSection from "@/components/BrandSection";
@@ -10,7 +10,7 @@ import Footer from "@/components/Footer"; // PERUBAHAN: Impor komponen Footer
 const Index = () => {
   return (
     <div className="min-h-screen bg-background pb-16 md:pb-0">
-      <Navbar />
+     
       <SearchSection />
       <HeroSection />
       <BrandSection />
