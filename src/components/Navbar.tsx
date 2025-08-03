@@ -13,15 +13,31 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { User, LogOut } from "lucide-react";
-import NotificationBell from "./NotificationBell"; // PERUBAHAN: Impor komponen baru
+import NotificationBell from "./NotificationBell";
+import { useToast } from "@/hooks/use-toast"; // <-- 1. Impor useToast
 
 const Navbar = () => {
   const { user, role, signOut } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast(); // <-- 2. Inisialisasi hook toast
 
   const handleSignOut = async () => {
-    await signOut();
-    navigate('/');
+    try {
+      await signOut();
+      // --- 3. Tambahkan notifikasi di sini ---
+      toast({
+        title: "Logout Berhasil",
+        description: "Anda telah berhasil keluar dari akun.",
+      });
+      // ------------------------------------
+      navigate('/');
+    } catch (error: any) {
+      toast({
+        title: "Logout Gagal",
+        description: error.message || "Terjadi kesalahan saat mencoba keluar.",
+        variant: "destructive",
+      });
+    }
   };
 
   const profileLink = role === 'mua' ? '/mua/dashboard' : '/customer/profile';
@@ -38,7 +54,6 @@ const Navbar = () => {
         <div className="flex items-center gap-2">
           {user ? (
             <>
-              {/* PERUBAHAN: Tambahkan NotificationBell di sini */}
               <NotificationBell />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
