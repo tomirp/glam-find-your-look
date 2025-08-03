@@ -11,11 +11,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
-import { Calendar, ArrowLeft, ArrowRight, Star, XCircle } from "lucide-react";
+import { Calendar, ArrowLeft, Star, XCircle } from "lucide-react";
 import { SearchingReplacementCard } from "@/components/SearchingReplacementCard";
+import { CancellationReasonModal } from "@/components/CancellationReasonModal";
 
-// Tipe data booking dari CustomerProfile.tsx
+// Tipe data booking
 interface Booking {
   id: string;
   booking_date: string;
@@ -48,6 +48,9 @@ const Activity = () => {
     const [bookings, setBookings] = useState<Booking[]>([]);
     const [loading, setLoading] = useState(true);
 
+    const [isCancelModalOpen, setCancelModalOpen] = useState(false);
+    const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+
     const fetchBookings = async () => {
         if (!user) return;
         setLoading(true);
@@ -78,15 +81,22 @@ const Activity = () => {
         }
     }, [user, authLoading, toast]);
 
-    const handleCancelBooking = async (bookingId: string) => {
-        if (!window.confirm("Apakah Anda yakin ingin membatalkan pesanan ini?")) return;
+    const handleCancelBooking = async (reason: string) => {
+        if (!selectedBooking) return;
         
         toast({ description: "Memproses pembatalan..." });
         try {
-            const { error } = await supabase.rpc('cancel_booking_by_customer', { p_booking_id: bookingId });
+            // --- PERBAIKAN DI SINI ---
+            const { error } = await supabase.rpc('cancel_booking_by_customer', { 
+                p_booking_id: selectedBooking.id, // Menggunakan p_booking_id
+                cancellation_reason_param: reason 
+            });
+            // ------------------------
+
             if (error) throw error;
+            
             toast({ title: "Berhasil", description: "Pesanan Anda telah dibatalkan."});
-            fetchBookings(); // Muat ulang data untuk menampilkan status terbaru
+            fetchBookings();
         } catch (error: any) {
             toast({ title: "Gagal", description: error.message, variant: "destructive" });
         }
@@ -123,7 +133,6 @@ const Activity = () => {
                             Lihat Invoice
                         </Button>
                         {booking.status === 'completed' && (
-                            // **PERBAIKAN DI SINI:** Mengarahkan ke halaman ulasan yang benar
                             <Button size="sm" onClick={() => navigate(`/review/${booking.id}`)} className="w-full sm:w-auto">
                                 <Star className="h-4 w-4 mr-2" />
                                 Berikan Ulasan
@@ -133,7 +142,10 @@ const Activity = () => {
                             <Button 
                                 variant="destructive"
                                 size="sm"
-                                onClick={() => handleCancelBooking(booking.id)}
+                                onClick={() => {
+                                    setSelectedBooking(booking);
+                                    setCancelModalOpen(true);
+                                }}
                                 className="w-full sm:w-auto"
                             >
                                 <XCircle className="h-4 w-4 mr-2" />
@@ -165,6 +177,7 @@ const Activity = () => {
         <div className="min-h-screen bg-background pb-16 md:pb-0">
             <Navbar />
             <div className="container mx-auto px-4 py-8">
+                {/* ... sisa kode tidak berubah ... */}
                 <div className="mb-6">
                     <Button variant="ghost" onClick={() => navigate("/")}>
                         <ArrowLeft className="h-4 w-4 mr-2" />
@@ -202,6 +215,13 @@ const Activity = () => {
                     </CardContent>
                 </Card>
             </div>
+            <CancellationReasonModal
+                isOpen={isCancelModalOpen}
+                onClose={() => setCancelModalOpen(false)}
+                onSubmit={handleCancelBooking}
+                title="Batalkan Pesanan"
+                description="Harap berikan alasan singkat mengapa Anda membatalkan pesanan ini."
+            />
         </div>
     );
 }

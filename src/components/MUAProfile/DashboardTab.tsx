@@ -1,24 +1,14 @@
 // src/components/MUAProfile/DashboardTab.tsx
 
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { CancellationReasonModal } from '@/components/CancellationReasonModal';
 import { supabase } from "@/integrations/supabase/client";
 import { CalendarIcon, DollarSign, Star, Clock, XCircle, CheckCircle } from "lucide-react";
 import { Booking, Service } from "./types";
 import { formatCurrency, getStatusColor } from "./utils";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 
 interface DashboardTabProps {
   bookings: Booking[];
@@ -34,27 +24,51 @@ export const DashboardTab = ({ bookings, services, onBookingUpdate }: DashboardT
     .reduce((sum, b) => sum + b.total_price, 0);
     
   const { toast } = useToast();
+  
+  const [isRejectModalOpen, setRejectModalOpen] = useState(false);
+  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
 
-  const handleUpdateBookingStatus = async (bookingId: string, newStatus: 'accepted' | 'rejected') => {
-    const actionText = newStatus === 'accepted' ? 'Menerima' : 'Menolak';
-    toast({ description: `${actionText} pesanan...` });
-
+  const handleAcceptBooking = async (bookingId: string) => {
+    toast({ description: "Menerima pesanan..." });
     try {
+      // --- PERBAIKAN DI SINI ---
       const { error } = await supabase.rpc('update_booking_status_by_mua', {
-        p_booking_id: bookingId,
-        p_new_status: newStatus
+        p_booking_id: bookingId, // Menggunakan p_booking_id
+        p_new_status: 'accepted'
       });
+      // ------------------------
 
       if (error) throw error;
 
-      toast({ title: "Berhasil", description: `Pesanan telah ${actionText === 'Menerima' ? 'diterima' : 'ditolak'}.` });
+      toast({ title: "Berhasil", description: "Pesanan telah diterima." });
       onBookingUpdate();
     } catch (error: any) {
       toast({ title: "Gagal", description: error.message, variant: "destructive" });
     }
   };
 
-  // PERUBAHAN BARU: Fungsi untuk menandai pesanan selesai
+  const handleRejectBooking = async (reason: string) => {
+    if (!selectedBooking) return;
+    toast({ description: "Menolak pesanan..." });
+
+    try {
+      // --- PERBAIKAN DI SINI ---
+      const { error } = await supabase.rpc('update_booking_status_by_mua', {
+        p_booking_id: selectedBooking.id, // Menggunakan p_booking_id
+        p_new_status: 'rejected',
+        cancellation_reason_param: reason
+      });
+      // ------------------------
+
+      if (error) throw error;
+
+      toast({ title: "Berhasil", description: "Pesanan telah ditolak." });
+      onBookingUpdate();
+    } catch (error: any) {
+      toast({ title: "Gagal", description: error.message, variant: "destructive" });
+    }
+  };
+
   const handleCompleteBooking = async (bookingId: string) => {
     toast({ description: "Menyelesaikan pesanan..." });
     try {
@@ -72,6 +86,7 @@ export const DashboardTab = ({ bookings, services, onBookingUpdate }: DashboardT
 
   return (
     <div className="space-y-8">
+      {/* ... Sisa kode tidak berubah ... */}
       <div className="grid gap-4 sm:grid-cols-3">
         <Card className="border-0 shadow-lg">
           <CardContent className="p-4 flex items-center justify-between">
@@ -132,7 +147,10 @@ export const DashboardTab = ({ bookings, services, onBookingUpdate }: DashboardT
                                 variant="destructive"
                                 size="default"
                                 className="flex-1 text-xs sm:text-sm"
-                                onClick={() => handleUpdateBookingStatus(booking.id, 'rejected')}
+                                onClick={() => {
+                                  setSelectedBooking(booking);
+                                  setRejectModalOpen(true);
+                                }}
                               >
                                 <XCircle className="h-4 w-4 mr-2" />
                                 Tolak
@@ -140,7 +158,7 @@ export const DashboardTab = ({ bookings, services, onBookingUpdate }: DashboardT
                               <Button
                                 size="default"
                                 className="flex-1 bg-green-600 hover:bg-green-700 text-xs sm:text-sm"
-                                onClick={() => handleUpdateBookingStatus(booking.id, 'accepted')}
+                                onClick={() => handleAcceptBooking(booking.id)}
                               >
                                 <CheckCircle className="h-4 w-4 mr-2" />
                                 Terima
@@ -184,7 +202,6 @@ export const DashboardTab = ({ bookings, services, onBookingUpdate }: DashboardT
                                     </p>
                                     <p className="text-xs text-muted-foreground">{booking.booking_time}</p>
                                 </div>
-                                {/* PERUBAHAN BARU: Tombol "Tandai Selesai" ditambahkan di sini */}
                                 <Button
                                   size="sm"
                                   className="bg-primary hover:bg-primary/90"
@@ -205,6 +222,14 @@ export const DashboardTab = ({ bookings, services, onBookingUpdate }: DashboardT
           </div>
         </CardContent>
       </Card>
+
+      <CancellationReasonModal
+        isOpen={isRejectModalOpen}
+        onClose={() => setRejectModalOpen(false)}
+        onSubmit={handleRejectBooking}
+        title="Tolak Pesanan"
+        description="Harap berikan alasan singkat mengapa Anda menolak pesanan ini."
+      />
     </div>
   );
 };

@@ -606,7 +606,9 @@ export type Database = {
         Returns: undefined
       }
       cancel_booking_by_customer: {
-        Args: { p_booking_id: string }
+        Args:
+          | { booking_id_param: string; cancellation_reason_param: string }
+          | { p_booking_id: string }
         Returns: undefined
       }
       complete_booking: {
@@ -659,10 +661,16 @@ export type Database = {
         }[]
       }
       update_booking_status_by_mua: {
-        Args: {
-          p_booking_id: string
-          p_new_status: Database["public"]["Enums"]["booking_status"]
-        }
+        Args:
+          | {
+              booking_id_param: string
+              new_status: Database["public"]["Enums"]["booking_status"]
+              cancellation_reason_param?: string
+            }
+          | {
+              p_booking_id: string
+              p_new_status: Database["public"]["Enums"]["booking_status"]
+            }
         Returns: undefined
       }
     }

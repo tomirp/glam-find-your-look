@@ -29,6 +29,7 @@ import LeaveReview from "./pages/LeaveReview";
 import AuthHandler from "./components/AuthHandler";
 import Navbar from "./components/Navbar";
 import MUADashboard from "./pages/MUADashboard";
+import { LoginNotificationPopup } from "./components/LoginNotificationPopup"; // <-- 1. Impor komponen baru
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { refetchOnWindowFocus: false } },
@@ -39,11 +40,9 @@ const AppLayout = () => {
   const location = useLocation();
 
   const checkPath = (pathname: string) => {
-    // Rute dengan path yang sama persis
     const exactShowRoutes = ['/', '/search', '/aktivitas', '/customer/profile'];
     if (exactShowRoutes.includes(pathname)) return true;
 
-    // PERBAIKAN: Tampilkan juga di halaman detail MUA
     if (pathname.startsWith('/mua/')) return true;
     
     return false;
@@ -80,6 +79,7 @@ const AppLayout = () => {
         <Route path="*" element={<NotFound />} />
       </Routes>
       {shouldShowBottomNav && <BottomNav />}
+      <LoginNotificationPopup /> {/* <-- 2. Tambahkan komponen pop-up di sini */}
     </>
   );
 };
