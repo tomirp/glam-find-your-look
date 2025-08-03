@@ -66,21 +66,12 @@ const WaitingForPayment = () => {
     toast({ description: "Mengonfirmasi pembayaran Anda..." });
 
     try {
-        // Update status di tabel 'payments' menjadi 'paid'
-        const { error: paymentUpdateError } = await supabase
-            .from('payments')
-            .update({ payment_status: 'paid' })
-            .eq('id', paymentDetails.id);
+        const { data, error } = await supabase
+            .rpc('confirm_payment', {
+                p_payment_id: paymentDetails.id
+            });
 
-        if (paymentUpdateError) throw paymentUpdateError;
-
-        // Update juga status di tabel 'bookings' menjadi 'accepted'
-        const { error: bookingUpdateError } = await supabase
-            .from('bookings')
-            .update({ status: 'accepted' })
-            .eq('id', paymentDetails.booking_id);
-        
-        if (bookingUpdateError) throw bookingUpdateError;
+        if (error) throw error;
 
         toast({ title: "Pembayaran Berhasil!", description: "Anda akan diarahkan ke halaman invoice." });
         
@@ -88,7 +79,11 @@ const WaitingForPayment = () => {
 
     } catch (error: any) {
         console.error("Confirmation Error:", error);
-        toast({ title: "Konfirmasi Gagal", description: error.message, variant: "destructive" });
+        toast({ 
+            title: "Konfirmasi Gagal", 
+            description: error.message.includes('already confirmed') ? 'Pembayaran sudah dikonfirmasi sebelumnya.' : error.message, 
+            variant: "destructive" 
+        });
     } finally {
         setIsProcessing(false);
     }

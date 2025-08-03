@@ -10,15 +10,49 @@ export type Database = {
   // Allows to automatically instanciate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "12.2.3 (519615d)"
+    PostgrestVersion: "12.2.12 (cd3cf9e)"
   }
   public: {
     Tables: {
+      blocked_slots: {
+        Row: {
+          created_at: string
+          end_time: string
+          id: string
+          mua_profile_id: string
+          start_time: string
+        }
+        Insert: {
+          created_at?: string
+          end_time: string
+          id?: string
+          mua_profile_id: string
+          start_time: string
+        }
+        Update: {
+          created_at?: string
+          end_time?: string
+          id?: string
+          mua_profile_id?: string
+          start_time?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "blocked_slots_mua_profile_id_fkey"
+            columns: ["mua_profile_id"]
+            isOneToOne: false
+            referencedRelation: "mua_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bookings: {
         Row: {
           booking_date: string
           booking_time: string
+          cancellation_reason: string | null
           created_at: string
+          customer_address: string | null
           customer_id: string
           customer_notes: string | null
           id: string
@@ -33,7 +67,9 @@ export type Database = {
         Insert: {
           booking_date: string
           booking_time: string
+          cancellation_reason?: string | null
           created_at?: string
+          customer_address?: string | null
           customer_id: string
           customer_notes?: string | null
           id?: string
@@ -48,7 +84,9 @@ export type Database = {
         Update: {
           booking_date?: string
           booking_time?: string
+          cancellation_reason?: string | null
           created_at?: string
+          customer_address?: string | null
           customer_id?: string
           customer_notes?: string | null
           id?: string
@@ -144,6 +182,7 @@ export type Database = {
           conversation_id: string
           created_at: string
           id: number
+          image_url: string | null
           sender_id: string
         }
         Insert: {
@@ -151,6 +190,7 @@ export type Database = {
           conversation_id: string
           created_at?: string
           id?: number
+          image_url?: string | null
           sender_id: string
         }
         Update: {
@@ -158,6 +198,7 @@ export type Database = {
           conversation_id?: string
           created_at?: string
           id?: number
+          image_url?: string | null
           sender_id?: string
         }
         Relationships: [
@@ -572,15 +613,29 @@ export type Database = {
         Args: { p_booking_id: string }
         Returns: undefined
       }
+      confirm_payment: {
+        Args: { p_payment_id: string }
+        Returns: boolean
+      }
       create_new_booking: {
-        Args: {
-          p_mua_profile_id: string
-          p_service_id: string
-          p_booking_date: string
-          p_booking_time: string
-          p_total_price: number
-          p_platform_fee: number
-        }
+        Args:
+          | {
+              p_mua_profile_id: string
+              p_service_id: string
+              p_booking_date: string
+              p_booking_time: string
+              p_total_price: number
+              p_platform_fee: number
+            }
+          | {
+              p_mua_profile_id: string
+              p_service_id: string
+              p_booking_date: string
+              p_booking_time: string
+              p_total_price: number
+              p_platform_fee: number
+              p_customer_notes?: string
+            }
         Returns: string
       }
       get_all_specializations: {

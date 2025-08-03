@@ -275,7 +275,7 @@ const MUADetail = () => {
         </div>
       )}
       
-      {isModalOpen && mua && ( <BookingModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} muaData={{ id: mua.id, name: mua.business_name }} selectedService={selectedService} /> )}
+      {isModalOpen && mua && ( <BookingModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} muaData={{ id: mua.id, business_name: mua.business_name, avatar_url: mua.profiles?.avatar_url }} selectedService={selectedService} /> )}
       {!isMobile && isChatOpen && activeConversationId && ( <ChatPopup conversationId={activeConversationId} onClose={() => setIsChatOpen(false)} /> )}
     </>
   );

@@ -95,7 +95,8 @@ const Checkout = () => {
             p_booking_date: new Date(bookingData.date).toISOString().slice(0, 10),
             p_booking_time: bookingData.time,
             p_total_price: totalPrice,
-            p_platform_fee: PLATFORM_FEE
+            p_platform_fee: PLATFORM_FEE,
+            p_customer_notes: customerNotes
         });
 
       if (error) {
@@ -103,11 +104,11 @@ const Checkout = () => {
         throw new Error(error.message);
       }
       if (!data) {
-        throw new Error("Gagal mendapatkan ID booking setelah pembuatan.");
+        throw new Error("Gagal mendapatkan Payment ID setelah pembuatan.");
       }
 
       toast({ title: "Pesanan Dibuat!", description: "Anda akan diarahkan ke halaman pembayaran." });
-      navigate('/payment', { state: { bookingId: data }, replace: true });
+      navigate('/waiting-for-payment/' + data, { replace: true });
 
     } catch (error: any) {
       toast({ title: "Gagal Membuat Pesanan", description: "Terjadi kesalahan. Coba lagi nanti.", variant: "destructive" });

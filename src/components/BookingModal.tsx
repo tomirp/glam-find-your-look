@@ -31,7 +31,8 @@ interface BookingModalProps {
   onClose: () => void;
   muaData: {
     id: string;
-    name: string;
+    business_name: string;
+    avatar_url?: string;
   };
   selectedService: SelectedService | null;
 }
@@ -98,7 +99,8 @@ const BookingModal = ({ isOpen, onClose, muaData, selectedService }: BookingModa
     setIsSubmitting(true);
     const bookingData = {
       muaId: muaData.id,
-      muaName: muaData.name,
+      muaName: muaData.business_name,
+      muaAvatar: muaData.avatar_url,
       serviceId: selectedService.id,
       serviceName: selectedService.name,
       price: selectedService.price_min,

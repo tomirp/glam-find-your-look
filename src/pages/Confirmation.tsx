@@ -53,7 +53,7 @@ const Confirmation = () => {
         profiles!bookings_customer_id_fkey ( full_name, address )
       `)
       .eq('id', bookingId)
-      .single();
+      .maybeSingle();
 
     if (error || !data) {
       console.error("Error fetching confirmation details:", error);
