@@ -9,7 +9,7 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute = ({ allowedRoles }: ProtectedRouteProps) => {
-  const { role, loading, user, setLoginRedirect } = useAuth();
+  const { role, loading, user, setLoginRedirect, loginRedirect } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -31,8 +31,10 @@ const ProtectedRoute = ({ allowedRoles }: ProtectedRouteProps) => {
     return <Outlet />;
   }
 
-  // Simpan redirect location dan arahkan ke auth
-  setLoginRedirect({ pathname: location.pathname, state: location.state });
+  // Simpan redirect location dan arahkan ke auth HANYA jika belum ada redirect
+  if (!loginRedirect || loginRedirect.pathname !== location.pathname) {
+    setLoginRedirect({ pathname: location.pathname, state: location.state });
+  }
   return <Navigate to="/auth" replace />;
 };
 
