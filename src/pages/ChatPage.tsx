@@ -19,7 +19,8 @@ const ChatPage = () => {
   const [messages, setMessages] = useState<any[]>([]);
   const [otherParticipant, setOtherParticipant] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [isSending, setIsSending] = useState(false); // 3. State untuk loading kirim pesan
+  const [isSending, setIsSending] = useState(false);
+  const [currentUserProfileId, setCurrentUserProfileId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!conversationId || !user) {
@@ -30,6 +31,16 @@ const ChatPage = () => {
     const fetchConversationDetails = async () => {
       setLoading(true);
       try {
+        // Pertama, dapatkan profile ID user saat ini
+        const { data: currentProfile, error: currentProfileError } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('user_id', user.id)
+          .single();
+        
+        if (currentProfileError) throw currentProfileError;
+        setCurrentUserProfileId(currentProfile.id);
+
         // Ambil info percakapan
         const { data: convData, error: convError } = await supabase
           .from('conversations')
@@ -39,7 +50,7 @@ const ChatPage = () => {
 
         if (convError) throw convError;
 
-        const otherUserId = convData.participant_ids.find((id: string) => id !== user.id);
+        const otherUserId = convData.participant_ids.find((id: string) => id !== currentProfile.id);
         if (otherUserId) {
           const { data: profileData } = await supabase.from('profiles').select('*').eq('id', otherUserId).single();
           setOtherParticipant(profileData);
@@ -86,7 +97,7 @@ const ChatPage = () => {
 
   // --- INI ADALAH LOGIKA PENGIRIMAN GAMBAR YANG BARU ---
   const handleSendMessage = async (content: string, file?: File) => {
-    if (!user || (!content.trim() && !file)) return;
+    if (!user || !currentUserProfileId || (!content.trim() && !file)) return;
 
     setIsSending(true);
     let imageUrl: string | null = null;
@@ -109,7 +120,7 @@ const ChatPage = () => {
       // Langkah B: Simpan pesan ke database (termasuk URL gambar jika ada)
       const { error: insertError } = await supabase.from('messages').insert({
         conversation_id: conversationId,
-        sender_id: user.id,
+        sender_id: currentUserProfileId, // Gunakan profile ID, bukan auth user ID
         content: content,
         image_url: imageUrl, // Simpan URL gambar di sini
       });
@@ -136,7 +147,7 @@ const ChatPage = () => {
         <h2 className="text-lg font-semibold">{otherParticipant?.business_name || otherParticipant?.full_name || 'Chat'}</h2>
       </header>
       <main className="flex-grow overflow-y-auto">
-        <ChatMessage messages={messages} currentUserId={user?.id || ''} />
+        <ChatMessage messages={messages} currentUserId={currentUserProfileId || ''} />
       </main>
       <footer className="sticky bottom-0">
         {/* 4. Berikan prop 'isSending' ke ChatInput */}

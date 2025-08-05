@@ -22,6 +22,7 @@ const ChatPopup = ({ conversationId, onClose }: ChatPopupProps) => {
   const [isSending, setIsSending] = useState(false);
   const [otherParticipant, setOtherParticipant] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [currentUserProfileId, setCurrentUserProfileId] = useState<string | null>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -29,6 +30,16 @@ const ChatPopup = ({ conversationId, onClose }: ChatPopupProps) => {
       if (!user) return;
       
       try {
+        // Pertama, dapatkan profile ID user saat ini
+        const { data: currentProfile, error: currentProfileError } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('user_id', user.id)
+          .single();
+        
+        if (currentProfileError) throw currentProfileError;
+        setCurrentUserProfileId(currentProfile.id);
+
         const { data: convData, error: convError } = await supabase
           .from('conversations')
           .select('participant_ids')
@@ -38,17 +49,29 @@ const ChatPopup = ({ conversationId, onClose }: ChatPopupProps) => {
         if (convError || !convData) throw convError || new Error("Percakapan tidak ditemukan.");
         
         const participantIds = convData.participant_ids;
-        const otherUserId = participantIds.find((id: string) => id !== user.id); 
+        const otherUserId = participantIds.find((id: string) => id !== currentProfile.id);
 
         if (otherUserId) {
+          // Ambil data profil dasar terlebih dahulu
           const { data: profileData, error: profileError } = await supabase
             .from('profiles')
-            .select('id, full_name, business_name, avatar_url')
+            .select('id, full_name, avatar_url')
             .eq('id', otherUserId)
             .single();
           
           if (profileError) throw profileError;
-          setOtherParticipant(profileData);
+          
+          // Coba ambil business_name dari mua_profiles jika ada
+          const { data: muaData } = await supabase
+            .from('mua_profiles')
+            .select('business_name')
+            .eq('profile_id', otherUserId)
+            .single();
+          
+          setOtherParticipant({
+            ...profileData,
+            business_name: muaData?.business_name || null
+          });
         }
         
         const { data: messagesData, error: messagesError } = await supabase
@@ -88,7 +111,7 @@ const ChatPopup = ({ conversationId, onClose }: ChatPopupProps) => {
   }, [conversationId, toast, user]);
 
   const handleSendMessage = async (text: string, file?: File) => {
-    if (!user || (!text.trim() && !file)) return;
+    if (!user || !currentUserProfileId || (!text.trim() && !file)) return;
     setIsSending(true);
 
     let imageUrl: string | null = null;
@@ -110,7 +133,7 @@ const ChatPopup = ({ conversationId, onClose }: ChatPopupProps) => {
       // Insert message dengan image URL
       const { error } = await supabase.from('messages').insert({
         conversation_id: conversationId,
-        sender_id: user.id,
+        sender_id: currentUserProfileId, // Gunakan profile ID, bukan auth user ID
         content: text,
         image_url: imageUrl,
       });
@@ -118,6 +141,7 @@ const ChatPopup = ({ conversationId, onClose }: ChatPopupProps) => {
       if (error) throw error;
 
     } catch (error: any) {
+      console.error('Error sending message:', error);
       toast({ title: "Gagal Mengirim Pesan", description: error.message, variant: "destructive" });
     } finally {
       setIsSending(false);
@@ -137,7 +161,7 @@ const ChatPopup = ({ conversationId, onClose }: ChatPopupProps) => {
           {loading ? (
             <div className="flex h-full items-center justify-center"><LoaderCircle className="h-8 w-8 animate-spin text-primary" /></div>
           ) : (
-            <ChatMessage messages={messages} currentUserId={user?.id || ''} /> // <-- PERBAIKAN 2: Nama komponen diubah
+            <ChatMessage messages={messages} currentUserId={currentUserProfileId || ''} /> 
           )}
         </CardContent>
         <CardFooter className="p-0">
