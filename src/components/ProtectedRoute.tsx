@@ -3,6 +3,7 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { LoadingSpinner } from "./LoadingSpinner";
+import { useEffect } from "react";
 
 interface ProtectedRouteProps {
   allowedRoles: Array<'mua' | 'customer'>;
@@ -12,6 +13,13 @@ const ProtectedRoute = ({ allowedRoles }: ProtectedRouteProps) => {
   const { role, loading, user, setLoginRedirect, loginRedirect } = useAuth();
   const location = useLocation();
 
+  // Use useEffect to handle state updates safely
+  useEffect(() => {
+    if (!loading && !user && (!loginRedirect || loginRedirect.pathname !== location.pathname)) {
+      setLoginRedirect({ pathname: location.pathname, state: location.state });
+    }
+  }, [loading, user, loginRedirect, location.pathname, location.state, setLoginRedirect]);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -20,21 +28,14 @@ const ProtectedRoute = ({ allowedRoles }: ProtectedRouteProps) => {
     );
   }
 
-  // PERBAIKAN UTAMA:
-  // 1. Cek apakah pengguna sudah login (user ada).
-  // 2. Cek apakah peran pengguna termasuk dalam peran yang diizinkan.
+  // Check if user is authorized
   const isAuthorized = user && role && allowedRoles.includes(role);
 
-  // Jika pengguna sudah diotorisasi, tampilkan halaman yang diminta.
-  // Jika tidak, arahkan ke halaman login sambil menyimpan halaman tujuan mereka.
   if (isAuthorized) {
     return <Outlet />;
   }
 
-  // Simpan redirect location dan arahkan ke auth HANYA jika belum ada redirect
-  if (!loginRedirect || loginRedirect.pathname !== location.pathname) {
-    setLoginRedirect({ pathname: location.pathname, state: location.state });
-  }
+  // If not authorized, redirect to auth
   return <Navigate to="/auth" replace />;
 };
 
