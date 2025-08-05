@@ -661,16 +661,11 @@ export type Database = {
         }[]
       }
       update_booking_status_by_mua: {
-        Args:
-          | {
-              p_booking_id: string
-              p_new_status: Database["public"]["Enums"]["booking_status"]
-            }
-          | {
-              p_booking_id: string
-              p_new_status: Database["public"]["Enums"]["booking_status"]
-              cancellation_reason_param?: string
-            }
+        Args: {
+          p_booking_id: string
+          p_new_status: Database["public"]["Enums"]["booking_status"]
+          cancellation_reason_param?: string
+        }
         Returns: undefined
       }
     }
