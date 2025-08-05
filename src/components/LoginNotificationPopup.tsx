@@ -28,11 +28,17 @@ export const LoginNotificationPopup = () => {
                     .eq('user_id', user.id)
                     .eq('is_read', false)
                     .order('created_at', { ascending: false })
-                    .limit(1)
-                    .single();
+                    .limit(1);
 
-                if (data) {
-                    setNotification(data);
+                if (data && data.length > 0) {
+                    // Prioritaskan notifikasi tentang pesanan
+                    const bookingNotification = data.find(n => 
+                        n.message.includes('diterima') || 
+                        n.message.includes('ditolak') || 
+                        n.message.includes('selesai') ||
+                        n.message.includes('dibatalkan')
+                    );
+                    setNotification(bookingNotification || data[0]);
                 }
             };
             const initialFetchTimeout = setTimeout(fetchUnreadNotification, 1500);

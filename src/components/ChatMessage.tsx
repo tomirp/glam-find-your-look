@@ -62,7 +62,14 @@ export const ChatMessage = ({ messages, currentUserId }: ChatMessageProps) => {
                   : "bg-muted"
               )}
             >
-              {message.content}
+              {message.image_url && (
+                <img 
+                  src={message.image_url} 
+                  alt="Gambar chat" 
+                  className="rounded-md max-w-full h-auto mb-2"
+                />
+              )}
+              {message.content && <div>{message.content}</div>}
             </div>
           </div>
         );

@@ -88,17 +88,40 @@ const ChatPopup = ({ conversationId, onClose }: ChatPopupProps) => {
   }, [conversationId, toast, user]);
 
   const handleSendMessage = async (text: string, file?: File) => {
-    if (!user) return;
+    if (!user || (!text.trim() && !file)) return;
     setIsSending(true);
 
-    const { error } = await supabase.from('messages').insert({
-      conversation_id: conversationId,
-      sender_id: user.id,
-      content: text,
-    });
+    let imageUrl: string | null = null;
 
-    if (error) toast({ title: "Gagal Mengirim Pesan", description: error.message, variant: "destructive" });
-    setIsSending(false);
+    try {
+      // Upload file jika ada
+      if (file) {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Date.now()}.${fileExt}`;
+        const filePath = `${conversationId}/${fileName}`;
+        
+        const { error: uploadError } = await supabase.storage.from('chat_images').upload(filePath, file);
+        if (uploadError) throw uploadError;
+
+        const { data: urlData } = supabase.storage.from('chat_images').getPublicUrl(filePath);
+        imageUrl = urlData.publicUrl;
+      }
+
+      // Insert message dengan image URL
+      const { error } = await supabase.from('messages').insert({
+        conversation_id: conversationId,
+        sender_id: user.id,
+        content: text,
+        image_url: imageUrl,
+      });
+
+      if (error) throw error;
+
+    } catch (error: any) {
+      toast({ title: "Gagal Mengirim Pesan", description: error.message, variant: "destructive" });
+    } finally {
+      setIsSending(false);
+    }
   };
 
   return (
