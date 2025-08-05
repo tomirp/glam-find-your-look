@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 
-import Navbar from "@/components/Navbar";
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -175,7 +175,6 @@ const Activity = () => {
 
     return (
         <div className="min-h-screen bg-background pb-16 md:pb-0">
-            <Navbar />
             <div className="container mx-auto px-4 py-8">
                 {/* ... sisa kode tidak berubah ... */}
                 <div className="mb-6">

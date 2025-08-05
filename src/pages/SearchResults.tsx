@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Filter } from "lucide-react";
-import Navbar from "@/components/Navbar";
+
 import MUACard, { MUAProfileForCard } from "@/components/MUACard";
 import MUACardSkeleton from "@/components/MUACardSkeleton";
 import FilterSidebar, { Filters } from "@/components/FilterSidebar";
@@ -75,7 +75,6 @@ const SearchResults = () => {
 
   return (
     <div className="min-h-screen bg-background pb-16 md:pb-0">
-      <Navbar />
       <div className="container mx-auto px-4 py-8">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6">
           <div>

@@ -5,7 +5,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-import Navbar from '@/components/Navbar';
+
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
@@ -110,7 +110,6 @@ const LeaveReview = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar />
       <div className="container mx-auto max-w-2xl px-4 py-8">
         <Button variant="ghost" onClick={() => navigate('/aktivitas')} className="mb-4">
           <ArrowLeft className="h-4 w-4 mr-2" />

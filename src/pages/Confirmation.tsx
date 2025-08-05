@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react"; // PERBAIKAN: Impor us
 import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import Navbar from "@/components/Navbar";
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -76,7 +76,6 @@ const Confirmation = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar />
       <div className="container mx-auto max-w-2xl px-4 py-12">
         <Card className="shadow-lg">
           <CardHeader className="items-center bg-green-50 p-6">
