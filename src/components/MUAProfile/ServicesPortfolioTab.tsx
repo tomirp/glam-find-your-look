@@ -19,6 +19,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { UploadProgress } from "@/components/ui/upload-progress";
 
 interface ServicesPortfolioTabProps {
   muaProfile: MUAProfile | null;
@@ -26,6 +27,8 @@ interface ServicesPortfolioTabProps {
   onPortfolioUpload: (event: ChangeEvent<HTMLInputElement>) => void;
   onServiceAdded: () => void;
   onProfileUpdate: () => void;
+  portfolioUploading?: boolean;
+  portfolioProgress?: number;
 }
 
 export const ServicesPortfolioTab = ({
@@ -33,7 +36,9 @@ export const ServicesPortfolioTab = ({
   services,
   onPortfolioUpload,
   onServiceAdded,
-  onProfileUpdate
+  onProfileUpdate,
+  portfolioUploading,
+  portfolioProgress
 }: ServicesPortfolioTabProps) => {
   const { toast } = useToast();
 
@@ -107,18 +112,26 @@ export const ServicesPortfolioTab = ({
               </div>
             )}
           </div>
-          <div>
+          <div className="space-y-3">
             <Label htmlFor="portfolio-upload" className="cursor-pointer">
-              <Button asChild variant="outline" className="border-purple-200 hover:bg-purple-50" disabled={!muaProfile}>
+              <Button asChild variant="outline" className="border-purple-200 hover:bg-purple-50" disabled={!muaProfile || portfolioUploading}>
                 <span className="flex items-center gap-2">
                   <Upload className="h-4 w-4" />
-                  Unggah Foto Portofolio
+                  {portfolioUploading ? 'Mengunggah...' : 'Unggah Foto Portofolio'}
                 </span>
               </Button>
             </Label>
-            <Input id="portfolio-upload" type="file" className="hidden" accept="image/*" onChange={onPortfolioUpload} disabled={!muaProfile} />
+            <Input id="portfolio-upload" type="file" className="hidden" accept="image/*" onChange={onPortfolioUpload} disabled={!muaProfile || portfolioUploading} />
+            
+            <UploadProgress 
+              uploading={portfolioUploading || false} 
+              progress={portfolioProgress || 0} 
+              error={null}
+              filename="Portfolio"
+            />
+            
             {!muaProfile && (
-              <p className="text-sm text-red-500 mt-2">
+              <p className="text-sm text-red-500">
                 Harap lengkapi dan simpan profil Anda terlebih dahulu di tab 'Edit Profil' untuk mengunggah portofolio.
               </p>
             )}

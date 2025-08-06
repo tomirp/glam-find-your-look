@@ -7,14 +7,17 @@ import { Label } from "@/components/ui/label";
 import { User, Star, MapPin, Phone, Upload } from "lucide-react";
 import { MUAProfile, UserProfile } from "./types";
 import { ChangeEvent } from "react";
+import { UploadProgress } from "@/components/ui/upload-progress";
 
 interface ProfileHeaderProps {
   muaProfile: MUAProfile | null;
   userProfile: UserProfile | null;
   onAvatarUpload: (event: ChangeEvent<HTMLInputElement>) => void;
+  avatarUploading?: boolean;
+  avatarProgress?: number;
 }
 
-export const ProfileHeader = ({ muaProfile, userProfile, onAvatarUpload }: ProfileHeaderProps) => {
+export const ProfileHeader = ({ muaProfile, userProfile, onAvatarUpload, avatarUploading, avatarProgress }: ProfileHeaderProps) => {
   return (
     <Card className="mb-8 overflow-hidden border-0 shadow-xl bg-gradient-to-r from-purple-600 to-pink-600">
       <CardContent className="p-4 sm:p-6 text-white">
@@ -69,6 +72,18 @@ export const ProfileHeader = ({ muaProfile, userProfile, onAvatarUpload }: Profi
             </div>
           </div>
         </div>
+        
+        {(avatarUploading || avatarProgress) && (
+          <div className="mt-4">
+            <UploadProgress 
+              uploading={avatarUploading || false} 
+              progress={avatarProgress || 0} 
+              error={null}
+              filename="Avatar"
+              className="text-white"
+            />
+          </div>
+        )}
       </CardContent>
     </Card>
   );

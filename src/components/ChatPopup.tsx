@@ -7,8 +7,9 @@ import { useToast } from '@/hooks/use-toast';
 import { Card, CardHeader, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { X, LoaderCircle } from 'lucide-react';
-import { ChatMessage } from './ChatMessage'; // <-- PERBAIKAN 1: Nama impor diubah
+import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
+import { useUploadProgress } from '@/hooks/useUploadProgress';
 
 interface ChatPopupProps {
   conversationId: string;
@@ -18,6 +19,7 @@ interface ChatPopupProps {
 const ChatPopup = ({ conversationId, onClose }: ChatPopupProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { uploading, uploadFile } = useUploadProgress();
   const [messages, setMessages] = useState<any[]>([]);
   const [isSending, setIsSending] = useState(false);
   const [otherParticipant, setOtherParticipant] = useState<any>(null);
@@ -123,11 +125,7 @@ const ChatPopup = ({ conversationId, onClose }: ChatPopupProps) => {
         const fileName = `${Date.now()}.${fileExt}`;
         const filePath = `${conversationId}/${fileName}`;
         
-        const { error: uploadError } = await supabase.storage.from('chat_images').upload(filePath, file);
-        if (uploadError) throw uploadError;
-
-        const { data: urlData } = supabase.storage.from('chat_images').getPublicUrl(filePath);
-        imageUrl = urlData.publicUrl;
+        imageUrl = await uploadFile('chat_images', filePath, file);
       }
 
       // Insert message dengan image URL
@@ -165,7 +163,7 @@ const ChatPopup = ({ conversationId, onClose }: ChatPopupProps) => {
           )}
         </CardContent>
         <CardFooter className="p-0">
-          <ChatInput onSendMessage={handleSendMessage} isSending={isSending} />
+          <ChatInput onSendMessage={handleSendMessage} isSending={isSending || uploading} />
         </CardFooter>
       </Card>
     </div>

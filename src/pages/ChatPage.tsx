@@ -7,14 +7,16 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, LoaderCircle } from 'lucide-react';
-import { ChatInput } from '@/components/ChatInput'; // 1. Impor yang benar
-import { ChatMessage } from '@/components/ChatMessage'; // 2. Impor yang benar
+import { ChatInput } from '@/components/ChatInput';
+import { ChatMessage } from '@/components/ChatMessage';
+import { useUploadProgress } from '@/hooks/useUploadProgress';
 
 const ChatPage = () => {
   const { conversationId } = useParams<{ conversationId: string }>();
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { uploading, uploadFile } = useUploadProgress();
 
   const [messages, setMessages] = useState<any[]>([]);
   const [otherParticipant, setOtherParticipant] = useState<any>(null);
@@ -110,11 +112,7 @@ const ChatPage = () => {
         // Path file dibuat unik untuk setiap percakapan
         const filePath = `${conversationId}/${fileName}`;
         
-        const { error: uploadError } = await supabase.storage.from('chat_images').upload(filePath, file);
-        if (uploadError) throw uploadError;
-
-        const { data: urlData } = supabase.storage.from('chat_images').getPublicUrl(filePath);
-        imageUrl = urlData.publicUrl;
+        imageUrl = await uploadFile('chat_images', filePath, file);
       }
 
       // Langkah B: Simpan pesan ke database (termasuk URL gambar jika ada)
@@ -150,8 +148,7 @@ const ChatPage = () => {
         <ChatMessage messages={messages} currentUserId={currentUserProfileId || ''} />
       </main>
       <footer className="sticky bottom-0">
-        {/* 4. Berikan prop 'isSending' ke ChatInput */}
-        <ChatInput onSendMessage={handleSendMessage} isSending={isSending} />
+        <ChatInput onSendMessage={handleSendMessage} isSending={isSending || uploading} />
       </footer>
     </div>
   );

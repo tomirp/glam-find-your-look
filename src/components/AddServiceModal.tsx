@@ -6,10 +6,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { PlusCircle, Upload, Save, LoaderCircle } from "lucide-react"; // Pastikan LoaderCircle diimpor
+import { PlusCircle, Upload, Save, LoaderCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { useUploadProgress } from "@/hooks/useUploadProgress";
+import { UploadProgress } from "@/components/ui/upload-progress";
 
 interface AddServiceModalProps {
   muaProfileId: string;
@@ -24,6 +26,7 @@ const AddServiceModal = ({ muaProfileId, onServiceAdded }: AddServiceModalProps)
   const [isAddingService, setIsAddingService] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
+  const { uploading, uploadFile } = useUploadProgress();
 
   const handleServiceChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -55,10 +58,7 @@ const AddServiceModal = ({ muaProfileId, onServiceAdded }: AddServiceModalProps)
       const fileName = `${Date.now()}.${fileExt}`;
       const filePath = `${user.id}/${fileName}`;
       
-      const { error: uploadError } = await supabase.storage.from('services').upload(filePath, newServiceFile);
-      if (uploadError) throw uploadError;
-      
-      const { data: urlData } = supabase.storage.from('services').getPublicUrl(filePath);
+      const imageUrl = await uploadFile('services', filePath, newServiceFile);
       
       const { error: insertError } = await supabase.from('services').insert({
         mua_profile_id: muaProfileId,
@@ -66,7 +66,7 @@ const AddServiceModal = ({ muaProfileId, onServiceAdded }: AddServiceModalProps)
         description: newService.description,
         price_min: newService.price_min,
         duration_minutes: newService.duration_minutes,
-        image_url: urlData.publicUrl,
+        image_url: imageUrl,
         is_active: true
       });
       
@@ -136,7 +136,8 @@ const AddServiceModal = ({ muaProfileId, onServiceAdded }: AddServiceModalProps)
                       </div>
                     )}
                   </div>
-                  <Input type="file" className="mt-2" accept="image/*" onChange={handleFileSelect} required />
+                  <Input type="file" className="mt-2" accept="image/*" onChange={handleFileSelect} required disabled={uploading} />
+                  <UploadProgress uploading={uploading} progress={0} error={null} filename={newServiceFile?.name} />
                 </div>
               </div>
             </div>

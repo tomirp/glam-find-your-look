@@ -5,6 +5,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useUploadProgress } from "@/hooks/useUploadProgress";
 
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -25,13 +26,15 @@ const MUAProfile = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
+  const avatarUpload = useUploadProgress();
+  const portfolioUpload = useUploadProgress();
 
   const [muaProfile, setMuaProfile] = useState<MUAProfileType | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [pageLoading, setPageLoading] = useState(true);
-  const [isSavingProfile, setIsSavingProfile] = useState(false); // State untuk tombol simpan
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
 
   const [editForm, setEditForm] = useState<EditForm>({
     business_name: '', full_name: '', phone: '', location_city: '',
@@ -112,11 +115,56 @@ const MUAProfile = () => {
   };
 
   const handleAvatarUpload = async (event: ChangeEvent<HTMLInputElement>) => {
-    // ... (kode tidak berubah)
+    const file = event.target.files?.[0];
+    if (!file || !userProfile) return;
+
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `avatar-${Date.now()}.${fileExt}`;
+      const filePath = `${userProfile.id}/${fileName}`;
+
+      const publicUrl = await avatarUpload.uploadFile('avatars', filePath, file, { upsert: true });
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({ avatar_url: publicUrl })
+        .eq('id', userProfile.id);
+
+      if (error) throw error;
+
+      toast({ title: "Berhasil!", description: "Avatar telah diperbarui." });
+      await fetchAllData();
+    } catch (error: any) {
+      toast({ title: "Gagal", description: error.message, variant: "destructive" });
+    }
   };
 
   const handlePortfolioUpload = async (event: ChangeEvent<HTMLInputElement>) => {
-    // ... (kode tidak berubah)
+    const file = event.target.files?.[0];
+    if (!file || !muaProfile) return;
+
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `portfolio-${Date.now()}.${fileExt}`;
+      const filePath = `${muaProfile.id}/${fileName}`;
+
+      const publicUrl = await portfolioUpload.uploadFile('portfolio', filePath, file);
+
+      const currentImages = muaProfile.portfolio_images || [];
+      const updatedImages = [...currentImages, publicUrl];
+
+      const { error } = await supabase
+        .from('mua_profiles')
+        .update({ portfolio_images: updatedImages })
+        .eq('id', muaProfile.id);
+
+      if (error) throw error;
+
+      toast({ title: "Berhasil!", description: "Foto portfolio telah ditambahkan." });
+      await fetchAllData();
+    } catch (error: any) {
+      toast({ title: "Gagal", description: error.message, variant: "destructive" });
+    }
   };
 
   // --- PERUBAHAN LOGIKA LOADING DIMULAI DI SINI ---
@@ -171,6 +219,8 @@ const MUAProfile = () => {
           muaProfile={muaProfile}
           userProfile={userProfile}
           onAvatarUpload={handleAvatarUpload}
+          avatarUploading={avatarUpload.uploading}
+          avatarProgress={avatarUpload.progress}
         />
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
@@ -187,7 +237,17 @@ const MUAProfile = () => {
           </div>
 
           <TabsContent value="dashboard"><DashboardTab bookings={bookings} services={services} onBookingUpdate={fetchAllData} /></TabsContent>
-          <TabsContent value="layanan"><ServicesPortfolioTab muaProfile={muaProfile} services={services} onPortfolioUpload={handlePortfolioUpload} onServiceAdded={fetchAllData} onProfileUpdate={fetchAllData} /></TabsContent>
+          <TabsContent value="layanan">
+            <ServicesPortfolioTab 
+              muaProfile={muaProfile} 
+              services={services} 
+              onPortfolioUpload={handlePortfolioUpload} 
+              onServiceAdded={fetchAllData} 
+              onProfileUpdate={fetchAllData}
+              portfolioUploading={portfolioUpload.uploading}
+              portfolioProgress={portfolioUpload.progress}
+            />
+          </TabsContent>
           <TabsContent value="ulasan"><ReviewsTab muaProfileId={muaProfile?.id || null} /></TabsContent>
           <TabsContent value="pendapatan"><EarningsTab muaProfileId={muaProfile?.id || null} /></TabsContent>
           <TabsContent value="jadwal"><ScheduleTab muaProfile={muaProfile} /></TabsContent>
