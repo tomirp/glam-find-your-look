@@ -2,64 +2,120 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Building, Send } from "lucide-react";
+import { OnboardingStepper } from "@/components/MUAOnboarding/OnboardingStepper";
+import { OnboardingStep1 } from "@/components/MUAOnboarding/OnboardingStep1";
+import { OnboardingStep2 } from "@/components/MUAOnboarding/OnboardingStep2";
+import { OnboardingStep3 } from "@/components/MUAOnboarding/OnboardingStep3";
+import { OnboardingStep4 } from "@/components/MUAOnboarding/OnboardingStep4";
 
 const MUAOnboarding = () => {
-  const { user, session } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
 
-  const [formData, setFormData] = useState({
+  const [step1Data, setStep1Data] = useState({
     business_name: "",
     location_city: "",
     location_address: "",
+    whatsapp_number: "",
     specializations: "",
     price_range: "",
     instagram_url: "",
-    whatsapp_number: "",
   });
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { id, value } = e.target;
-    setFormData((prev) => ({ ...prev, [id]: value }));
-  };
+  const [step2Data, setStep2Data] = useState({
+    portfolio_images: [],
+    cover_image_url: "",
+    bio: "",
+  });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const [step3Data, setStep3Data] = useState({
+    services: [],
+  });
+
+  const [step4Data, setStep4Data] = useState({
+    completed: false,
+  });
+
+  const steps = [
+    { title: "Info Bisnis", description: "Detail dasar bisnis Anda" },
+    { title: "Portofolio", description: "Showcase karya terbaik" },
+    { title: "Layanan", description: "Atur layanan & harga" },
+    { title: "Selesai", description: "Profil siap digunakan" }
+  ];
+
+  const handleComplete = async () => {
     if (!user) {
       toast({ title: "Error", description: "Anda harus masuk untuk melanjutkan.", variant: "destructive" });
       return;
     }
+
     setLoading(true);
-
     try {
-        const { data: profile } = await supabase.from('profiles').select('id').eq('user_id', user.id).single();
+      const { data: profile } = await supabase.from('profiles').select('id').eq('user_id', user.id).single();
 
-        if (profile) {
-            const { error } = await supabase.from("mua_profiles").insert({
-                profile_id: profile.id,
-                business_name: formData.business_name,
-                location_city: formData.location_city,
-                location_address: formData.location_address,
-                specializations: formData.specializations.split(",").map(s => s.trim()),
-                price_range: formData.price_range,
-                instagram_url: formData.instagram_url,
-                whatsapp_number: formData.whatsapp_number,
-            });
+      if (!profile) {
+        throw new Error("Profile not found");
+      }
 
-            if (error) throw error;
+      // Update profile with bio
+      if (step2Data.bio) {
+        await supabase
+          .from('profiles')
+          .update({ bio: step2Data.bio })
+          .eq('id', profile.id);
+      }
 
-            toast({ title: "Berhasil!", description: "Profil MUA Anda telah dibuat." });
-            navigate("/mua/profile");
-        }
+      // Create MUA profile
+      const { data: muaProfile, error: muaError } = await supabase
+        .from("mua_profiles")
+        .insert({
+          profile_id: profile.id,
+          business_name: step1Data.business_name,
+          location_city: step1Data.location_city,
+          location_address: step1Data.location_address,
+          specializations: step1Data.specializations.split(",").map(s => s.trim()),
+          price_range: step1Data.price_range,
+          instagram_url: step1Data.instagram_url,
+          whatsapp_number: step1Data.whatsapp_number,
+          portfolio_images: step2Data.portfolio_images,
+          cover_image_url: step2Data.cover_image_url,
+          onboarding_completed: true,
+        })
+        .select()
+        .single();
 
+      if (muaError) throw muaError;
+
+      // Create services
+      if (step3Data.services.length > 0) {
+        const servicesData = step3Data.services.map(service => ({
+          mua_profile_id: muaProfile.id,
+          name: service.name,
+          description: service.description,
+          price_min: service.price_min,
+          price_max: service.price_max || service.price_min,
+          duration_minutes: service.duration_minutes,
+          image_url: service.image_url,
+          is_active: true,
+        }));
+
+        const { error: servicesError } = await supabase
+          .from("services")
+          .insert(servicesData);
+
+        if (servicesError) throw servicesError;
+      }
+
+      toast({ 
+        title: "Selamat!", 
+        description: "Profil MUA Anda telah berhasil dibuat dan siap menerima pesanan!" 
+      });
+      
+      navigate("/mua/profile");
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } finally {
@@ -67,65 +123,59 @@ const MUAOnboarding = () => {
     }
   };
 
+  const renderCurrentStep = () => {
+    switch (currentStep) {
+      case 1:
+        return (
+          <OnboardingStep1
+            data={step1Data}
+            onUpdate={(data) => setStep1Data(prev => ({ ...prev, ...data }))}
+            onNext={() => setCurrentStep(2)}
+          />
+        );
+      case 2:
+        return (
+          <OnboardingStep2
+            data={step2Data}
+            onUpdate={(data) => setStep2Data(prev => ({ ...prev, ...data }))}
+            onNext={() => setCurrentStep(3)}
+            onBack={() => setCurrentStep(1)}
+          />
+        );
+      case 3:
+        return (
+          <OnboardingStep3
+            data={step3Data}
+            onUpdate={(data) => setStep3Data(prev => ({ ...prev, ...data }))}
+            onNext={() => setCurrentStep(4)}
+            onBack={() => setCurrentStep(2)}
+          />
+        );
+      case 4:
+        return (
+          <OnboardingStep4
+            data={step4Data}
+            onUpdate={(data) => setStep4Data(prev => ({ ...prev, ...data }))}
+            onComplete={handleComplete}
+            onBack={() => setCurrentStep(3)}
+            loading={loading}
+          />
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-secondary/20 flex items-center justify-center p-4">
-      <div className="w-full max-w-2xl">
-        <Card>
-          <CardHeader className="text-center">
-            <div className="mx-auto bg-primary/10 rounded-full p-3 w-fit mb-4">
-                <Building className="h-8 w-8 text-primary" />
-            </div>
-            <CardTitle>Selesaikan Profil MUA Anda</CardTitle>
-            <CardDescription>
-              Berikan detail bisnis makeup Anda untuk menarik lebih banyak klien.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="business_name">Nama Bisnis/Brand MUA</Label>
-                  <Input id="business_name" value={formData.business_name} onChange={handleChange} placeholder="Contoh: Cantika Makeup" required />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="whatsapp_number">Nomor WhatsApp</Label>
-                  <Input id="whatsapp_number" value={formData.whatsapp_number} onChange={handleChange} placeholder="081234567890" required />
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                  <Label htmlFor="location_city">Kota</Label>
-                  <Input id="location_city" value={formData.location_city} onChange={handleChange} placeholder="Contoh: Jakarta Selatan" required />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="location_address">Alamat Lengkap (Opsional)</Label>
-                <Textarea id="location_address" value={formData.location_address} onChange={handleChange} placeholder="Gedung, jalan, dan nomor" />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="specializations">Spesialisasi</Label>
-                <Input id="specializations" value={formData.specializations} onChange={handleChange} placeholder="Pisahkan dengan koma, contoh: Wedding, Graduation" required/>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="price_range">Rentang Harga</Label>
-                  <Input id="price_range" value={formData.price_range} onChange={handleChange} placeholder="Contoh: Rp 300.000 - Rp 1.500.000" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="instagram_url">Instagram (Opsional)</Label>
-                  <Input id="instagram_url" value={formData.instagram_url} onChange={handleChange} placeholder="https://instagram.com/akunanda" />
-                </div>
-              </div>
-
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Menyimpan..." : "Simpan dan Lanjutkan"}
-                <Send className="w-4 h-4 ml-2" />
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+    <div className="min-h-screen bg-gradient-to-br from-background via-secondary/10 to-primary/5 py-8 px-4">
+      <div className="max-w-4xl mx-auto">
+        <OnboardingStepper 
+          currentStep={currentStep} 
+          totalSteps={4} 
+          steps={steps}
+        />
+        
+        {renderCurrentStep()}
       </div>
     </div>
   );
