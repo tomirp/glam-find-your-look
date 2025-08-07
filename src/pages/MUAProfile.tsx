@@ -139,19 +139,12 @@ const MUAProfile = () => {
     }
   };
 
-  const handlePortfolioUpload = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file || !muaProfile) return;
+  const handlePortfolioUpload = async (imageUrl: string) => {
+    if (!muaProfile) return;
 
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `portfolio-${Date.now()}.${fileExt}`;
-      const filePath = `${muaProfile.id}/${fileName}`;
-
-      const publicUrl = await portfolioUpload.uploadFile('portfolio', filePath, file);
-
       const currentImages = muaProfile.portfolio_images || [];
-      const updatedImages = [...currentImages, publicUrl];
+      const updatedImages = [...currentImages, imageUrl];
 
       const { error } = await supabase
         .from('mua_profiles')
@@ -242,10 +235,7 @@ const MUAProfile = () => {
               muaProfile={muaProfile} 
               services={services} 
               onPortfolioUpload={handlePortfolioUpload} 
-              onServiceAdded={fetchAllData} 
-              onProfileUpdate={fetchAllData}
-              portfolioUploading={portfolioUpload.uploading}
-              portfolioProgress={portfolioUpload.progress}
+              onRefreshData={fetchAllData}
             />
           </TabsContent>
           <TabsContent value="ulasan"><ReviewsTab muaProfileId={muaProfile?.id || null} /></TabsContent>

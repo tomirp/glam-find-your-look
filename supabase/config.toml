@@ -1,1 +1,17 @@
 project_id = "xvkdnyxcdcxwpdgkijpy"
+
+[auth]
+enabled = true
+site_url = "https://xvkdnyxcdcxwpdgkijpy.lovableproject.com"
+additional_redirect_urls = ["https://localhost:3000"]
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = false
+
+[functions.send-verification-whatsapp]
+verify_jwt = true
+
+[functions.portfolio-verification]
+verify_jwt = false

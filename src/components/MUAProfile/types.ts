@@ -10,6 +10,7 @@ export interface MUAProfile {
   total_bookings: number | null;
   is_available: boolean | null;
   portfolio_images: string[] | null;
+  verified_portfolio_images?: any;
   vehicle_availability: 'none' | 'motorcycle' | 'car';
   profile_id: string;
   specializations: string[] | null;
