@@ -278,6 +278,7 @@ export type Database = {
           total_reviews: number | null
           updated_at: string
           vehicle_availability: Database["public"]["Enums"]["vehicle_type"]
+          verified_portfolio_images: Json | null
           whatsapp_number: string | null
         }
         Insert: {
@@ -304,6 +305,7 @@ export type Database = {
           total_reviews?: number | null
           updated_at?: string
           vehicle_availability?: Database["public"]["Enums"]["vehicle_type"]
+          verified_portfolio_images?: Json | null
           whatsapp_number?: string | null
         }
         Update: {
@@ -330,6 +332,7 @@ export type Database = {
           total_reviews?: number | null
           updated_at?: string
           vehicle_availability?: Database["public"]["Enums"]["vehicle_type"]
+          verified_portfolio_images?: Json | null
           whatsapp_number?: string | null
         }
         Relationships: [
@@ -425,6 +428,54 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      portfolio_verifications: {
+        Row: {
+          client_name: string
+          client_phone: string
+          client_whatsapp: string
+          created_at: string
+          expires_at: string
+          id: string
+          mua_profile_id: string
+          portfolio_image_url: string
+          updated_at: string
+          verification_message: string | null
+          verification_status: string
+          verification_token: string
+          verified_at: string | null
+        }
+        Insert: {
+          client_name: string
+          client_phone: string
+          client_whatsapp: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          mua_profile_id: string
+          portfolio_image_url: string
+          updated_at?: string
+          verification_message?: string | null
+          verification_status?: string
+          verification_token?: string
+          verified_at?: string | null
+        }
+        Update: {
+          client_name?: string
+          client_phone?: string
+          client_whatsapp?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          mua_profile_id?: string
+          portfolio_image_url?: string
+          updated_at?: string
+          verification_message?: string | null
+          verification_status?: string
+          verification_token?: string
+          verified_at?: string | null
+        }
+        Relationships: []
       }
       profiles: {
         Row: {
@@ -618,6 +669,10 @@ export type Database = {
       confirm_payment: {
         Args: { p_payment_id: string }
         Returns: boolean
+      }
+      confirm_portfolio_verification: {
+        Args: { p_token: string; p_status: string; p_message?: string }
+        Returns: Json
       }
       create_new_booking: {
         Args:
