@@ -38,6 +38,7 @@ const PopularMUASection = () => {
       const { data, error } = await supabase
         .from("mua_profiles")
         .select(`id, business_name, rating, total_reviews, location_city, specializations, cover_image_url, services(price_min)`)
+        .or('location_city.ilike.Jakarta%,location_city.ilike.Bandung%')
         .order('rating', { ascending: false, nullsFirst: false })
         .limit(4);
 

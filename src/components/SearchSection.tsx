@@ -30,6 +30,11 @@ const SearchSection = () => {
                 <SelectItem value="Jakarta Utara">Jakarta Utara</SelectItem>
                 <SelectItem value="Jakarta Barat">Jakarta Barat</SelectItem>
                 <SelectItem value="Jakarta Timur">Jakarta Timur</SelectItem>
+                <SelectItem value="Bandung">Bandung</SelectItem>
+                <SelectItem value="Bandung Utara">Bandung Utara</SelectItem>
+                <SelectItem value="Bandung Barat">Bandung Barat</SelectItem>
+                <SelectItem value="Bandung Timur">Bandung Timur</SelectItem>
+                <SelectItem value="Bandung Selatan">Bandung Selatan</SelectItem>
                 <SelectItem value="Tangerang">Tangerang</SelectItem>
                 <SelectItem value="Bekasi">Bekasi</SelectItem>
               </SelectContent>
