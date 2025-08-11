@@ -30,6 +30,7 @@ import AuthHandler from "./components/AuthHandler";
 import Navbar from "./components/Navbar";
 import MUADashboard from "./pages/MUADashboard";
 import { LoginNotificationPopup } from "./components/LoginNotificationPopup"; // <-- 1. Impor komponen baru
+import AdminSeed from "./pages/AdminSeed";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { refetchOnWindowFocus: false } },
@@ -59,6 +60,7 @@ const AppLayout = () => {
         <Route path="/auth" element={<Auth />} />
         <Route path="/search" element={<SearchResults />} />
         <Route path="/mua/:id" element={<MUADetail />} />
+        <Route path="/admin/seed" element={<AdminSeed />} />
         <Route element={<ProtectedRoute allowedRoles={['mua']} />}>
           <Route path="/mua/profile" element={<MUAProfile />} />
           <Route path="/mua/dashboard" element={<MUADashboard />} />
