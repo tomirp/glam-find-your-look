@@ -15,3 +15,6 @@ verify_jwt = true
 
 [functions.portfolio-verification]
 verify_jwt = false
+
+[functions.seed-mua]
+verify_jwt = true

@@ -15,11 +15,14 @@ import {
 import { User, LogOut } from "lucide-react";
 import NotificationBell from "./NotificationBell";
 import { useToast } from "@/hooks/use-toast"; // <-- 1. Impor useToast
+import { ADMIN_EMAIL_WHITELIST } from "@/config/admin";
 
 const Navbar = () => {
   const { user, role, signOut } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast(); // <-- 2. Inisialisasi hook toast
+
+  const isAdmin = !!user?.email && ADMIN_EMAIL_WHITELIST.includes(user.email.toLowerCase());
 
   const handleSignOut = async () => {
     try {
@@ -48,8 +51,12 @@ const Navbar = () => {
         <Link to="/" className="text-2xl font-bold font-heading text-primary mr-6">
           GlamFind
         </Link>
-        <nav className="flex-1">
-          {/* Bisa ditambahkan link navigasi lain di sini jika perlu */}
+        <nav className="flex-1 flex items-center gap-4">
+          {isAdmin && (
+            <Button variant="ghost" onClick={() => navigate('/akses/admin/seed')}>
+              Admin
+            </Button>
+          )}
         </nav>
         <div className="flex items-center gap-2">
           {user ? (
