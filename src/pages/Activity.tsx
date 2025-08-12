@@ -6,7 +6,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 
-
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -86,19 +85,33 @@ const Activity = () => {
         
         toast({ description: "Memproses pembatalan..." });
         try {
-            // --- PERBAIKAN DI SINI ---
             const { error } = await supabase.rpc('cancel_booking_by_customer', { 
-                p_booking_id: selectedBooking.id, // Menggunakan p_booking_id
+                p_booking_id: selectedBooking.id,
                 cancellation_reason_param: reason 
             });
-            // ------------------------
 
-            if (error) throw error;
-            
-            toast({ title: "Berhasil", description: "Pesanan Anda telah dibatalkan."});
-            fetchBookings();
+            if (error) {
+                // --- INI ADALAH BLOK YANG DIPERBARUI ---
+                // Memeriksa pesan error spesifik dari database
+                if (error.message.includes('Pesanan tidak dapat dibatalkan kurang dari 24 jam')) {
+                    toast({
+                        title: "Pembatalan Gagal",
+                        description: "Anda tidak dapat membatalkan pesanan yang akan berlangsung kurang dari 24 jam lagi.",
+                        variant: "destructive",
+                        duration: 7000,
+                    });
+                } else {
+                    // Menampilkan pesan error umum jika masalahnya berbeda
+                    toast({ title: "Gagal Membatalkan", description: error.message, variant: "destructive" });
+                }
+                // -----------------------------------------
+            } else {
+                toast({ title: "Berhasil", description: "Pesanan Anda telah dibatalkan."});
+                fetchBookings();
+            }
         } catch (error: any) {
-            toast({ title: "Gagal", description: error.message, variant: "destructive" });
+            // Blok catch ini untuk error yang tidak terduga
+            toast({ title: "Gagal", description: "Terjadi kesalahan tak terduga.", variant: "destructive" });
         }
     };
 
@@ -176,7 +189,6 @@ const Activity = () => {
     return (
         <div className="min-h-screen bg-background pb-16 md:pb-0">
             <div className="container mx-auto px-4 py-8">
-                {/* ... sisa kode tidak berubah ... */}
                 <div className="mb-6">
                     <Button variant="ghost" onClick={() => navigate("/")}>
                         <ArrowLeft className="h-4 w-4 mr-2" />

@@ -1,6 +1,6 @@
 // src/pages/Checkout.tsx
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,17 +10,12 @@ import { id as indonesiaLocale } from 'date-fns/locale';
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { ArrowLeft, Car, Bike, Tag, ShieldCheck, LoaderCircle, Palette, Calendar as CalendarIcon, Clock } from "lucide-react";
-import { Skeleton } from "@/components/ui/skeleton";
+import { ArrowLeft, Tag, ShieldCheck, LoaderCircle, Palette, Calendar as CalendarIcon, Clock } from "lucide-react";
 
 const formatCurrency = (amount: number) => new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(amount);
-
-type TransportOption = 'private' | 'online';
 
 const Checkout = () => {
   const location = useLocation();
@@ -35,9 +30,7 @@ const Checkout = () => {
   const [customerNotes, setCustomerNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Fee dari platform dan transportasi
   const PLATFORM_FEE = 5000;
-  const TRANSPORT_FEE = 25000;
 
   useEffect(() => {
     if (!bookingData) {
@@ -70,7 +63,6 @@ const Checkout = () => {
     fetchUserProfileId();
   }, [user, bookingData, toast, navigate]);
 
-
   if (!bookingData) {
     return <div className="min-h-screen flex items-center justify-center">Mengalihkan...</div>;
   }
@@ -100,18 +92,34 @@ const Checkout = () => {
         });
 
       if (error) {
-        console.error("Supabase RPC Error:", error);
-        throw new Error(error.message);
-      }
-      if (!data) {
+        // --- INI ADALAH BLOK YANG DIPERBARUI ---
+        // Memeriksa pesan error spesifik dari database
+        if (error.message.includes('Jadwal pada tanggal dan waktu ini tidak tersedia')) {
+            toast({
+                title: "Jadwal Tidak Tersedia",
+                description: "Maaf, slot waktu yang Anda pilih baru saja dipesan. Silakan kembali untuk memilih jadwal lain.",
+                variant: "destructive",
+                duration: 7000,
+            });
+        } else {
+            // Menampilkan pesan error umum jika masalahnya berbeda
+            toast({
+                title: "Gagal Membuat Pesanan",
+                description: "Terjadi kesalahan: " + error.message,
+                variant: "destructive"
+            });
+        }
+        // -----------------------------------------
+      } else if (!data) {
         throw new Error("Gagal mendapatkan Payment ID setelah pembuatan.");
+      } else {
+        toast({ title: "Pesanan Dibuat!", description: "Anda akan diarahkan ke halaman pembayaran." });
+        navigate('/waiting-for-payment/' + data, { replace: true });
       }
-
-      toast({ title: "Pesanan Dibuat!", description: "Anda akan diarahkan ke halaman pembayaran." });
-      navigate('/waiting-for-payment/' + data, { replace: true });
 
     } catch (error: any) {
-      toast({ title: "Gagal Membuat Pesanan", description: "Terjadi kesalahan. Coba lagi nanti.", variant: "destructive" });
+       // Blok catch ini sekarang hanya untuk error yang tidak terduga, bukan dari RPC
+       toast({ title: "Gagal Membuat Pesanan", description: "Terjadi kesalahan tak terduga. Coba lagi nanti.", variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
