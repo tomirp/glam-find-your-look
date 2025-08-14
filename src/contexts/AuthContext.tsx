@@ -1,8 +1,20 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+// src/contexts/AuthContext.tsx
+
+import { createContext, useContext, useEffect, useState } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
-// Tipe data untuk lokasi redirect
+// --- PERBAIKAN 1: Samakan tipe Profile dengan skema database ---
+type Profile = {
+  id: string;
+  user_id: string;
+  full_name: string | null;
+  avatar_url: string | null;
+  user_type: 'customer' | 'mua' | 'admin'; // Menggunakan user_type, bukan role
+  // tambahkan properti lain dari profil Anda jika ada
+};
+// -------------------------------------------------------------
+
 type RedirectLocation = {
   pathname: string;
   state: any;
@@ -10,6 +22,7 @@ type RedirectLocation = {
 
 interface AuthContextType {
   user: User | null;
+  profile: Profile | null;
   session: Session | null;
   role: 'customer' | 'mua' | null;
   loading: boolean;
@@ -36,14 +49,14 @@ export const useAuth = () => {
   return context;
 };
 
-export const AuthProvider = ({ children }: { children: ReactNode }) => {
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [role, setRole] = useState<'customer' | 'mua' | null>(null);
   const [muaProfileExists, setMuaProfileExists] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
   
-  // **PERBAIKAN: Gunakan sessionStorage untuk menyimpan redirect**
   const [loginRedirect, setLoginRedirectState] = useState<RedirectLocation | null>(() => {
     const storedRedirect = sessionStorage.getItem('loginRedirect');
     return storedRedirect ? JSON.parse(storedRedirect) : null;
@@ -71,38 +84,46 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const currentUser = session?.user ?? null;
       setUser(currentUser);
 
-      if (sessionError) {
+      if (sessionError || !currentUser) {
+        setProfile(null);
         setRole(null);
         setMuaProfileExists(null);
-      } else if (currentUser) {
-        const { data: profile, error: profileError } = await supabase
-          .from("profiles")
-          .select("id, user_type")
-          .eq("user_id", currentUser.id)
-          .single();
+        setLoading(false);
+        return;
+      }
+      
+      const { data: profileData, error: profileError } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("user_id", currentUser.id)
+        .single();
 
-        if (profileError) {
-          setRole(null);
-          setMuaProfileExists(null);
-        } else if (profile) {
-          setRole(profile.user_type);
-          if (profile.user_type === 'mua') {
-            const { data: muaProfile, error: muaProfileError } = await supabase
-              .from('mua_profiles')
-              .select('id')
-              .eq('profile_id', profile.id)
-              .single();
-            setMuaProfileExists(!!muaProfile && !muaProfileError);
-          } else {
-            setMuaProfileExists(null);
-          }
+      if (profileError) {
+        console.error("AuthContext Error: Gagal mengambil profil.", profileError);
+        setProfile(null);
+        setRole(null);
+        setMuaProfileExists(null);
+      } else if (profileData) {
+        // --- PERBAIKAN 1: Gunakan properti yang benar dari database ---
+        const typedProfile = profileData as Profile;
+        setProfile(typedProfile);
+        setRole(typedProfile.user_type as 'customer' | 'mua'); // Menggunakan user_type
+        // -------------------------------------------------------------
+
+        if (typedProfile.user_type === 'mua') {
+          // --- PERBAIKAN 2: Gunakan query yang lebih aman untuk TypeScript ---
+          const { data: muaProfile, error: muaProfileError } = await supabase
+            .from('mua_profiles')
+            .select('id')
+            .eq('profile_id', typedProfile.id)
+            .limit(1)
+            .single();
+          
+          setMuaProfileExists(!!muaProfile && !muaProfileError);
+          // -----------------------------------------------------------------
         } else {
-          setRole(null);
           setMuaProfileExists(null);
         }
-      } else {
-        setRole(null);
-        setMuaProfileExists(null);
       }
       setLoading(false);
     };
@@ -110,12 +131,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     fetchSessionAndProfile();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        if (_event !== 'SIGNED_OUT') {
-          fetchSessionAndProfile();
-        }
+      (_event, newSession) => {
+        setSession(newSession);
+        setUser(newSession?.user ?? null);
+        fetchSessionAndProfile();
       }
     );
 
@@ -123,6 +142,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const signIn = async (email: string, password: string) => {
+    // ... (fungsi signIn tidak berubah)
     setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
@@ -130,26 +150,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signUp = async (email: string, password: string, userData: { fullName: string; userType: 'customer' | 'mua'; phone?: string; }) => {
+    // ... (fungsi signUp tidak berubah)
     const { error } = await supabase.auth.signUp({
-      email, password,
-      options: {
-        data: {
-          full_name: userData.fullName,
-          user_type: userData.userType,
-          phone: userData.phone
+        email, password,
+        options: {
+          data: {
+            full_name: userData.fullName,
+            user_type: userData.userType,
+            phone: userData.phone
+          }
         }
-      }
-    });
-    return { error };
+      });
+      return { error };
   };
 
    const signOut = async () => {
+    // ... (fungsi signOut tidak berubah)
     setLoading(true);
     const { error } = await supabase.auth.signOut();
     
-    // PERBAIKAN: Selalu bersihkan state lokal setelah logout
-    // untuk memastikan UI diperbarui secara instan.
     setUser(null);
+    setProfile(null);
     setSession(null);
     setRole(null);
     setMuaProfileExists(null);
@@ -158,7 +179,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return { error };
   };
   
-  const value = { user, session, role, loading, muaProfileExists, loginRedirect, setLoginRedirect, clearLoginRedirect, signIn, signUp, signOut };
+  const value = { user, profile, session, role, loading, muaProfileExists, loginRedirect, setLoginRedirect, clearLoginRedirect, signIn, signUp, signOut };
 
   return (
     <AuthContext.Provider value={value}>

@@ -4,10 +4,12 @@ import { useEffect, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { LoaderCircle, CheckCircle, Copy, ArrowLeft } from 'lucide-react';
+import { profile } from 'console';
 
 const formatCurrency = (amount: number) => new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(amount);
 
@@ -16,6 +18,7 @@ const WaitingForPayment = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user, profile } = useAuth(); 
 
   const [paymentDetails, setPaymentDetails] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -25,6 +28,11 @@ const WaitingForPayment = () => {
     if (!paymentId) {
       toast({ title: "Error", description: "ID Pembayaran tidak valid.", variant: "destructive" });
       navigate('/');
+      return;
+    }
+
+        // Pastikan profil pengguna sudah dimuat sebelum fetch data pembayaran
+    if (!profile) {
       return;
     }
 
@@ -38,6 +46,19 @@ const WaitingForPayment = () => {
           .single();
 
         if (error || !data) throw error || new Error("Detail pembayaran tidak ditemukan.");
+
+         // --- 3. LANGKAH VALIDASI KEAMANAN ---
+        // Periksa apakah ID pelanggan pada data booking cocok dengan ID profil pengguna yang login
+        if (data.bookings?.customer_id !== profile.id) {
+            toast({
+                title: "Akses Ditolak",
+                description: "Anda tidak memiliki izin untuk melihat halaman ini.",
+                variant: "destructive"
+            });
+            navigate('/'); // Arahkan keluar dari halaman
+            return;
+        }
+        // --- Akhir dari Validasi ---
         
         setPaymentDetails(data);
 
@@ -58,7 +79,7 @@ const WaitingForPayment = () => {
     };
 
     fetchPaymentDetails();
-  }, [paymentId, navigate, toast]);
+  }, [paymentId, navigate, toast, profile]);
   
   const handlePaymentConfirmation = async () => {
     if (!paymentDetails) return;
