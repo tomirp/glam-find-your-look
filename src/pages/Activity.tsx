@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, ArrowLeft, Star, XCircle } from "lucide-react";
+import { Calendar, ArrowLeft, Star, XCircle, MessageSquareQuote } from "lucide-react";
 import { SearchingReplacementCard } from "@/components/SearchingReplacementCard";
 import { CancellationReasonModal } from "@/components/CancellationReasonModal";
 
@@ -20,6 +20,7 @@ interface Booking {
   booking_date: string;
   status: string;
   total_price: number;
+  cancellation_reason: string | null;
   mua_profiles: { business_name: string | null; };
   services: { name: string; };
   payments: { payment_status: string; } | null;
@@ -59,7 +60,7 @@ const Activity = () => {
 
             const { data: bookingsData, error: bookingError } = await supabase
                 .from('bookings')
-                .select(`*, mua_profiles(business_name), services(name), payments!left(payment_status)`)
+                .select(`*, cancellation_reason, mua_profiles(business_name), services(name), payments!left(payment_status)`)
                 .eq('customer_id', profileData.id)
                 .order('booking_date', { ascending: false });
 
@@ -91,8 +92,6 @@ const Activity = () => {
             });
 
             if (error) {
-                // --- INI ADALAH BLOK YANG DIPERBARUI ---
-                // Memeriksa pesan error spesifik dari database
                 if (error.message.includes('Pesanan tidak dapat dibatalkan kurang dari 24 jam')) {
                     toast({
                         title: "Pembatalan Gagal",
@@ -101,16 +100,13 @@ const Activity = () => {
                         duration: 7000,
                     });
                 } else {
-                    // Menampilkan pesan error umum jika masalahnya berbeda
                     toast({ title: "Gagal Membatalkan", description: error.message, variant: "destructive" });
                 }
-                // -----------------------------------------
             } else {
                 toast({ title: "Berhasil", description: "Pesanan Anda telah dibatalkan."});
                 fetchBookings();
             }
         } catch (error: any) {
-            // Blok catch ini untuk error yang tidak terduga
             toast({ title: "Gagal", description: "Terjadi kesalahan tak terduga.", variant: "destructive" });
         }
     };
@@ -165,9 +161,21 @@ const Activity = () => {
                                 Batalkan Pesanan
                             </Button>
                         )}
+                    
                     </div>
                 </div>
             </div>
+            {/* --- INI ADALAH BLOK YANG DITAMBAHKAN --- */}
+            {/* Tampilkan alasan jika statusnya cancelled atau rejected dan ada alasannya */}
+            {(booking.status === 'cancelled' || booking.status === 'rejected') && booking.cancellation_reason && (
+              <div className="mt-4 pt-4 border-t border-border/50">
+                  <div className="flex items-start gap-3 text-sm text-muted-foreground">
+                      <MessageSquareQuote className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                      <p className="italic">"{booking.cancellation_reason}"</p>
+                  </div>
+              </div>
+            )}
+            {/* ------------------------------------------- */}
         </div>
     );
 

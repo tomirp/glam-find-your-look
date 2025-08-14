@@ -9,6 +9,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { CalendarIcon, DollarSign, Star, Clock, XCircle, CheckCircle } from "lucide-react";
 import { Booking, Service } from "./types";
 import { formatCurrency, getStatusColor } from "./utils";
+import { MessageSquareQuote } from "lucide-react";
+import { Badge } from "@/components/ui/badge"; // <-- Pastikan Badge diimpor
 
 interface DashboardTabProps {
   bookings: Booking[];
@@ -31,15 +33,11 @@ export const DashboardTab = ({ bookings, services, onBookingUpdate }: DashboardT
   const handleAcceptBooking = async (bookingId: string) => {
     toast({ description: "Menerima pesanan..." });
     try {
-      // --- PERBAIKAN DI SINI ---
       const { error } = await supabase.rpc('update_booking_status_by_mua', {
-        p_booking_id: bookingId, // Menggunakan p_booking_id
+        p_booking_id: bookingId,
         p_new_status: 'accepted'
       });
-      // ------------------------
-
       if (error) throw error;
-
       toast({ title: "Berhasil", description: "Pesanan telah diterima." });
       onBookingUpdate();
     } catch (error: any) {
@@ -50,18 +48,13 @@ export const DashboardTab = ({ bookings, services, onBookingUpdate }: DashboardT
   const handleRejectBooking = async (reason: string) => {
     if (!selectedBooking) return;
     toast({ description: "Menolak pesanan..." });
-
     try {
-      // --- PERBAIKAN DI SINI ---
       const { error } = await supabase.rpc('update_booking_status_by_mua', {
-        p_booking_id: selectedBooking.id, // Menggunakan p_booking_id
+        p_booking_id: selectedBooking.id,
         p_new_status: 'rejected',
         cancellation_reason_param: reason
       });
-      // ------------------------
-
       if (error) throw error;
-
       toast({ title: "Berhasil", description: "Pesanan telah ditolak." });
       onBookingUpdate();
     } catch (error: any) {
@@ -83,10 +76,11 @@ export const DashboardTab = ({ bookings, services, onBookingUpdate }: DashboardT
 
   const pendingBookings = bookings.filter(b => b.status === 'pending');
   const activeBookings = bookings.filter(b => b.status === 'accepted');
+  const failedBookings = bookings.filter(b => b.status === 'rejected' || b.status === 'cancelled');
 
   return (
     <div className="space-y-8">
-      {/* ... Sisa kode tidak berubah ... */}
+      {/* Card Statistik (tidak berubah) */}
       <div className="grid gap-4 sm:grid-cols-3">
         <Card className="border-0 shadow-lg">
           <CardContent className="p-4 flex items-center justify-between">
@@ -119,6 +113,7 @@ export const DashboardTab = ({ bookings, services, onBookingUpdate }: DashboardT
         </Card>
       </div>
       
+      {/* Card Perlu Persetujuan (tidak berubah) */}
       <Card className="border-0 shadow-lg">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -177,6 +172,7 @@ export const DashboardTab = ({ bookings, services, onBookingUpdate }: DashboardT
         </CardContent>
       </Card>
       
+      {/* Card Pesanan Aktif (tidak berubah) */}
       <Card className="border-0 shadow-lg">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -222,6 +218,53 @@ export const DashboardTab = ({ bookings, services, onBookingUpdate }: DashboardT
           </div>
         </CardContent>
       </Card>
+
+      {/* --- INI ADALAH BLOK YANG DIPERBARUI --- */}
+      {/* Menambahkan Card baru untuk menampilkan riwayat pesanan yang gagal */}
+      <Card className="border-0 shadow-lg">
+          <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                  <XCircle className="h-5 w-5 text-gray-500" />
+                  Riwayat Pesanan Gagal
+              </CardTitle>
+              <CardDescription>Daftar pesanan yang ditolak atau dibatalkan oleh pelanggan.</CardDescription>
+          </CardHeader>
+          <CardContent>
+              <div className="space-y-4">
+                  {failedBookings.length > 0 ? (
+                      failedBookings.map(booking => (
+                          <div key={booking.id} className="p-4 bg-gray-50 rounded-lg">
+                              <div className="flex flex-col sm:flex-row items-start justify-between gap-3">
+                                  <div className='flex-1'>
+                                      <h4 className="font-semibold">{booking.profiles?.full_name}</h4>
+                                      <p className="text-sm text-muted-foreground">{booking.services?.name}</p>
+                                  </div>
+                                  <div className="w-full sm:w-auto flex flex-col items-start sm:items-end gap-2">
+                                      <Badge className={`${getStatusColor(booking.status)} border`}>{booking.status}</Badge>
+                                      <p className="text-xs text-muted-foreground">
+                                          {new Date(booking.booking_date).toLocaleDateString('id-ID', {day: '2-digit', month: 'long'})}
+                                      </p>
+                                  </div>
+                              </div>
+                              {booking.cancellation_reason && (
+                                  <div className="mt-3 pt-3 border-t">
+                                      <div className="flex items-start gap-3 text-sm text-gray-600">
+                                          <MessageSquareQuote className="h-4 w-4 mt-0.5 flex-shrink-0 text-gray-400" />
+                                          <p className="italic">"{booking.cancellation_reason}"</p>
+                                      </div>
+                                  </div>
+                              )}
+                          </div>
+                      ))
+                  ) : (
+                      <div className="text-center py-12 text-gray-500">
+                          <p>Tidak ada riwayat pesanan yang ditolak atau dibatalkan.</p>
+                      </div>
+                  )}
+              </div>
+          </CardContent>
+      </Card>
+      {/* ------------------------------------------- */}
 
       <CancellationReasonModal
         isOpen={isRejectModalOpen}

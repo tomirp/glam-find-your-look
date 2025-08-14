@@ -32,6 +32,7 @@ export interface Booking {
   booking_time: string;
   status: 'pending' | 'accepted' | 'rejected' | 'completed' | 'cancelled';
   total_price: number;
+  cancellation_reason: string | null; // <-- TAMBAHKAN BARIS INI
   customer_notes: string | null;
   profiles: { // This is the customer's profile
     full_name: string | null;
