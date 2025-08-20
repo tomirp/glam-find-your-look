@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,30 +35,42 @@ const Payment = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user, profile } = useAuth(); // Ambil profile
 
-  const { bookingId } = location.state || {};
+
+  const { bookingId, paymentMethod } = location.state || {};
   const [bookingDetails, setBookingDetails] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod | undefined>();
 
   useEffect(() => {
-    if (!bookingId) {
+    if (!bookingId || !paymentMethod) {
       toast({ title: "Error", description: "Booking tidak valid.", variant: "destructive" });
       navigate('/');
       return;
     }
+
+    if (!profile) return;
 
     const fetchBookingDetails = async () => {
       setLoading(true);
       try {
         const { data, error } = await supabase
           .from('bookings')
-          .select(`*, services(name), mua_profiles(business_name)`)
+          .select(`*, customer_id, services(name), mua_profiles(business_name)`)
           .eq('id', bookingId)
           .single();
 
         if (error || !data) throw error || new Error("Booking tidak ditemukan.");
+
+        // --- BLOK VALIDASI KEAMANAN ---
+        if (data.customer_id !== profile.id) {
+          toast({ title: "Akses Ditolak", variant: "destructive" });
+          navigate('/');
+          return;
+        }
+        // --- AKHIR BLOK VALIDASI ---
 
         setBookingDetails(data);
       } catch (error) {
@@ -68,7 +81,7 @@ const Payment = () => {
       }
     };
     fetchBookingDetails();
-  }, [bookingId, navigate, toast]);
+  }, [bookingId, paymentMethod, navigate, toast, profile]);
 
   const handlePayment = async () => {
     if (!selectedMethod || !bookingDetails) return;

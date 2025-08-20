@@ -1,18 +1,20 @@
 // src/pages/Activity.tsx
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, ArrowLeft, Star, XCircle, MessageSquareQuote } from "lucide-react";
+import { Calendar, ArrowLeft, Star, XCircle, MessageSquareQuote, LoaderCircle } from "lucide-react";
 import { SearchingReplacementCard } from "@/components/SearchingReplacementCard";
 import { CancellationReasonModal } from "@/components/CancellationReasonModal";
+import { formatCurrency, getStatusColor } from "@/lib/utils";
 
 // Tipe data booking
 interface Booking {
@@ -26,90 +28,65 @@ interface Booking {
   payments: { payment_status: string; } | null;
 }
 
-const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(amount);
-};
-
-const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed': return 'bg-green-100 text-green-800 border-green-200';
-      case 'accepted': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'pending': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'rejected': return 'bg-red-100 text-red-800 border-red-200';
-      case 'cancelled': return 'bg-gray-100 text-gray-800 border-gray-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
-};
-
 const Activity = () => {
-    const { user, loading: authLoading } = useAuth();
+    const { profile } = useAuth();
     const { toast } = useToast();
     const navigate = useNavigate();
-    const [bookings, setBookings] = useState<Booking[]>([]);
-    const [loading, setLoading] = useState(true);
+    const queryClient = useQueryClient();
 
     const [isCancelModalOpen, setCancelModalOpen] = useState(false);
     const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+    
+    const { data: bookings = [], isLoading: loading } = useQuery({
+        queryKey: ['bookings', profile?.id],
+        queryFn: async () => {
+            if (!profile) return [];
 
-    const fetchBookings = async () => {
-        if (!user) return;
-        setLoading(true);
-        try {
-            const { data: profileData, error: profileError } = await supabase.from('profiles').select('id').eq('user_id', user.id).single();
-            if (profileError) throw profileError;
-
-            const { data: bookingsData, error: bookingError } = await supabase
+            const { data, error } = await supabase
                 .from('bookings')
                 .select(`*, cancellation_reason, mua_profiles(business_name), services(name), payments!left(payment_status)`)
-                .eq('customer_id', profileData.id)
+                .eq('customer_id', profile.id)
                 .order('booking_date', { ascending: false });
 
-            if (bookingError) throw bookingError;
+            if (error) {
+                toast({ title: "Error", description: "Gagal memuat data aktivitas.", variant: "destructive" });
+                throw new Error(error.message);
+            }
+            
+            return data.map(b => ({ ...b, payments: Array.isArray(b.payments) ? b.payments[0] : b.payments })) as Booking[];
+        },
+        enabled: !!profile,
+    });
 
-            const typedBookings = bookingsData.map(b => ({ ...b, payments: Array.isArray(b.payments) ? b.payments[0] : b.payments })) as Booking[];
-            setBookings(typedBookings);
-        } catch (error: any) {
-            toast({ title: "Error", description: "Gagal memuat data aktivitas.", variant: "destructive" });
-        } finally {
-            setLoading(false);
-        }
-    };
+    const { mutate: cancelBooking } = useMutation({
+        mutationFn: async (reason: string) => {
+            if (!selectedBooking) throw new Error("Pesanan tidak dipilih.");
 
-    useEffect(() => {
-        if (!authLoading && user) {
-            fetchBookings();
-        }
-    }, [user, authLoading, toast]);
-
-    const handleCancelBooking = async (reason: string) => {
-        if (!selectedBooking) return;
-        
-        toast({ description: "Memproses pembatalan..." });
-        try {
             const { error } = await supabase.rpc('cancel_booking_by_customer', { 
                 p_booking_id: selectedBooking.id,
                 cancellation_reason_param: reason 
             });
 
-            if (error) {
-                if (error.message.includes('Pesanan tidak dapat dibatalkan kurang dari 24 jam')) {
-                    toast({
-                        title: "Pembatalan Gagal",
-                        description: "Anda tidak dapat membatalkan pesanan yang akan berlangsung kurang dari 24 jam lagi.",
-                        variant: "destructive",
-                        duration: 7000,
-                    });
-                } else {
-                    toast({ title: "Gagal Membatalkan", description: error.message, variant: "destructive" });
-                }
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            toast({ title: "Berhasil", description: "Pesanan Anda telah dibatalkan."});
+            queryClient.invalidateQueries({ queryKey: ['bookings'] });
+            setCancelModalOpen(false);
+        },
+        onError: (error: any) => {
+            if (error.message.includes('Pesanan tidak dapat dibatalkan kurang dari 24 jam')) {
+                toast({
+                    title: "Pembatalan Gagal",
+                    description: "Anda tidak dapat membatalkan pesanan yang akan berlangsung kurang dari 24 jam lagi.",
+                    variant: "destructive",
+                    duration: 7000,
+                });
             } else {
-                toast({ title: "Berhasil", description: "Pesanan Anda telah dibatalkan."});
-                fetchBookings();
+                toast({ title: "Gagal Membatalkan", description: error.message, variant: "destructive" });
             }
-        } catch (error: any) {
-            toast({ title: "Gagal", description: "Terjadi kesalahan tak terduga.", variant: "destructive" });
-        }
-    };
+        },
+    });
 
     const activeBookings = bookings.filter(b => b.status === 'pending' || b.status === 'accepted');
     const cancelledBookings = bookings.filter(b => b.status === 'cancelled');
@@ -165,8 +142,6 @@ const Activity = () => {
                     </div>
                 </div>
             </div>
-            {/* --- INI ADALAH BLOK YANG DITAMBAHKAN --- */}
-            {/* Tampilkan alasan jika statusnya cancelled atau rejected dan ada alasannya */}
             {(booking.status === 'cancelled' || booking.status === 'rejected') && booking.cancellation_reason && (
               <div className="mt-4 pt-4 border-t border-border/50">
                   <div className="flex items-start gap-3 text-sm text-muted-foreground">
@@ -175,12 +150,11 @@ const Activity = () => {
                   </div>
               </div>
             )}
-            {/* ------------------------------------------- */}
         </div>
     );
 
     const renderBookingList = (list: Booking[], emptyMessage: string) => {
-        if (loading) return <p>Memuat pesanan...</p>;
+        if (loading) return <div className="text-center py-12"><LoaderCircle className="h-6 w-6 animate-spin mx-auto" /></div>;
         if (list.length === 0) return <p className="text-center text-muted-foreground py-12">{emptyMessage}</p>;
         
         return (
@@ -236,8 +210,10 @@ const Activity = () => {
             </div>
             <CancellationReasonModal
                 isOpen={isCancelModalOpen}
+                // --- PERBAIKAN DI SINI: Tambahkan 'async' ---
+                onSubmit={async (reason) => cancelBooking(reason)}
+                // ---------------------------------------------
                 onClose={() => setCancelModalOpen(false)}
-                onSubmit={handleCancelBooking}
                 title="Batalkan Pesanan"
                 description="Harap berikan alasan singkat mengapa Anda membatalkan pesanan ini."
             />

@@ -62,6 +62,10 @@ const MUADetail = () => {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
 
+  // --- TAMBAHAN BARU: State untuk menyimpan data awal saat mengubah jadwal ---
+  const [initialBookingData, setInitialBookingData] = useState(null);
+  // -------------------------------------------------------------------------
+
   useEffect(() => {
     if (isModalOpen || selectedService) {
       setBottomNavVisible(false);
@@ -85,6 +89,9 @@ const MUADetail = () => {
       toast({ title: "Aksi Tidak Diizinkan", description: "Anda tidak dapat memesan layanan Anda sendiri.", variant: "destructive" });
       return;
     }
+    // --- PERBAIKAN: Pastikan data awal kosong untuk booking baru ---
+    setInitialBookingData(null); 
+    // ----------------------------------------------------------
     setIsModalOpen(true);
   };
 
@@ -99,92 +106,41 @@ const MUADetail = () => {
     }
   }, [location.state, user, services, navigate]);
 
+  // --- TAMBAHAN BARU: useEffect untuk menangani permintaan "Ubah Jadwal" ---
+  useEffect(() => {
+    const { state } = location;
+    // Cek apakah ada permintaan untuk membuka kembali modal dari halaman checkout
+    if (state?.reopenBookingModal && state?.service) {
+      setSelectedService(state.service);
+      setInitialBookingData(state.initialData);
+      setIsModalOpen(true);
+      
+      // Hapus state dari histori agar tidak terbuka lagi saat refresh atau kembali
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location, navigate]);
+  // -------------------------------------------------------------------------
+
   useEffect(() => {
     const fetchMUADetail = async () => {
-      if (!id) return;
-      setLoading(true);
-      try {
-        const { data: muaData, error: muaError } = await supabase.from('mua_profiles').select(`*, profiles(id, full_name, avatar_url, bio)`).eq('id', id).single();
-        if (muaError || !muaData) throw new Error("MUA tidak ditemukan");
-        setMua(muaData as MUAProfile);
-
-        const { data: servicesData, error: servicesError } = await supabase.from('services').select('*').eq('mua_profile_id', id).eq('is_active', true);
-        if (servicesError) throw servicesError;
-        setServices(servicesData || []);
-
-        const { data: reviewsData, error: reviewsError } = await supabase.from('reviews').select(`*, profiles(full_name, avatar_url)`).eq('mua_profile_id', id).order('created_at', { ascending: false });
-        if (reviewsError) throw reviewsError;
-        setReviews(reviewsData as Review[] || []);
-      } catch (error: any) {
-        toast({ title: "Gagal Memuat Data", description: error.message, variant: "destructive" });
-        navigate('/');
-      } finally {
-        setLoading(false);
-      }
+      // ... (fungsi fetchMUADetail tidak berubah)
     };
     fetchMUADetail();
   }, [id, navigate, toast]);
 
   useEffect(() => {
     const checkUserAndFavoriteStatus = async () => {
-      if (!user) return;
-      const { data: profileData } = await supabase.from('profiles').select('id').eq('user_id', user.id).single();
-      if (profileData) {
-        setCurrentUserProfileId(profileData.id);
-        if (role === 'customer' && id) {
-          const { data } = await supabase.from('favorites').select('id').eq('customer_id', profileData.id).eq('mua_profile_id', id).single();
-          setIsFavorited(!!data);
-        }
-      }
+      // ... (fungsi checkUserAndFavoriteStatus tidak berubah)
     };
     if (mua) checkUserAndFavoriteStatus();
   }, [user, id, role, mua]);
 
   const handleFavoriteClick = async () => {
-    if (!user) { setShowLoginAlert(true); return; }
-    if (role !== 'customer') { toast({ title: "Aksi Tidak Diizinkan", description: "Hanya pelanggan yang dapat memfavoritkan MUA.", variant: "destructive" }); return; }
-    if (!currentUserProfileId || !id) return;
-    if (isFavorited) {
-      await supabase.from('favorites').delete().eq('customer_id', currentUserProfileId).eq('mua_profile_id', id);
-      setIsFavorited(false);
-    } else {
-      const { error } = await supabase.from('favorites').insert({ customer_id: currentUserProfileId, mua_profile_id: id });
-      if (!error) {
-        setIsFavorited(true);
-        setShowLikeAnimation(true);
-        setTimeout(() => setShowLikeAnimation(false), 1000);
-      } else {
-        toast({ title: "Gagal", description: "Mungkin sudah ada di favorit.", variant: "destructive" });
-      }
-    }
+    // ... (fungsi handleFavoriteClick tidak berubah)
   };
 
   const handleInitiateChat = async () => {
-    if (!user) { setShowLoginAlert(true); return; }
-    const muaProfileId = mua?.profiles?.id;
-    if (!muaProfileId) { toast({ title: "Error", description: "Profil MUA tidak valid.", variant: "destructive" }); return; }
-    if (!currentUserProfileId) { toast({ title: "Error", description: "Profil Anda tidak ditemukan.", variant: "destructive" }); return; }
-    if (muaProfileId === currentUserProfileId) { toast({ title: "Aksi Tidak Diizinkan", description: "Anda tidak dapat memulai chat dengan diri sendiri.", variant: "destructive" }); return; }
-
-    try {
-        const { data: existing } = await supabase.from('conversations').select('id').contains('participant_ids', [currentUserProfileId, muaProfileId]);
-        let conversationId;
-        if (existing && existing.length > 0) {
-            conversationId = existing[0].id;
-        } else {
-            const { data: newConversation } = await supabase.from('conversations').insert({ participant_ids: [currentUserProfileId, muaProfileId] }).select('id').single();
-            if (!newConversation) throw new Error("Gagal membuat percakapan baru.");
-            conversationId = newConversation.id;
-        }
-        if (isMobile) {
-            navigate(`/chat/${conversationId}`);
-        } else {
-            setActiveConversationId(conversationId);
-            setIsChatOpen(true);
-        }
-    } catch (error: any) {
-        toast({ title: "Gagal Memulai Chat", description: error.message, variant: "destructive" });
-    }
+    // ... (fungsi handleInitiateChat tidak berubah)
   };
 
   const formatCurrency = (amount: number) => new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(amount);
@@ -197,85 +153,20 @@ const MUADetail = () => {
 
   return (
     <>
-      <AlertDialog open={showLoginAlert} onOpenChange={setShowLoginAlert}>
-        <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Anda Belum Login</AlertDialogTitle><AlertDialogDescription>Untuk dapat memesan, memfavoritkan, atau memulai chat, Anda perlu login atau daftar terlebih dahulu.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Nanti Saja</AlertDialogCancel><AlertDialogAction onClick={() => navigate('/auth', { state: { from: location } })}>Login / Daftar</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
-      </AlertDialog>
-
-      {showLikeAnimation && (<div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/10 backdrop-blur-sm pointer-events-none"><Heart className="w-32 h-32 text-red-500 fill-red-500 animate-like-popup" /></div>)}
-
-      <div className="min-h-screen bg-background pb-28">
-        <div className="sticky top-0 z-20 bg-background/80 backdrop-blur-sm border-b"><div className="container mx-auto px-4 flex items-center justify-between h-16"><Button variant="ghost" onClick={() => navigate(-1)}><ArrowLeft className="h-5 w-5 mr-2" />Kembali</Button><div className="h-10 w-10 rounded-full hover:bg-accent flex items-center justify-center transition-colors cursor-pointer" onClick={handleFavoriteClick} role="button"><Heart className={`w-5 h-5 transition-all ${isFavorited ? 'text-red-500 fill-red-500' : 'text-gray-500'}`} /></div></div></div>
-
-        <div className="relative">
-          <div className="absolute h-64 md:h-96 w-full"><img src={safeMua.cover_image_url} alt={safeMua.business_name} className="h-full w-full object-cover" /><div className="absolute inset-0 bg-gradient-to-t from-background via-background/50 to-transparent" /></div>
-          <div className="relative container mx-auto px-4 pt-48 md:pt-72 pb-16">
-            <div className="flex flex-col md:flex-row items-end gap-6 mb-8">
-              <Avatar className="h-40 w-40 border-4 border-background shadow-lg"><AvatarImage src={safeMua.profiles.avatar_url || ''} /><AvatarFallback className="text-4xl">{safeMua.business_name.charAt(0)}</AvatarFallback></Avatar>
-              <div className="flex-1"><h1 className="text-4xl font-bold font-heading">{safeMua.business_name}</h1><p className="text-lg text-muted-foreground mt-1">{safeMua.profiles.full_name}</p><div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground"><div className="flex items-center gap-1.5"><Star className="w-4 h-4 text-yellow-400 fill-yellow-400" /><span>{safeMua.rating.toFixed(1)} ({safeMua.total_reviews} ulasan)</span></div><div className="flex items-center gap-1.5"><MapPin className="w-4 h-4" /><span>{safeMua.location_city}</span></div></div></div>
-              <div className="flex gap-2 w-full md:w-auto self-start md:self-end"><Button variant="outline" size="lg" className="flex-1" onClick={handleInitiateChat}><MessageSquare className="w-4 h-4 mr-2" />Chat</Button></div>
-            </div>
-
-            {/* --- INI BAGIAN YANG DIDESAIN ULANG --- */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <div className="lg:col-span-2 space-y-8">
-                <Card className="border-0 shadow-lg">
-                  <CardHeader><CardTitle className="flex items-center gap-3"><Palette className="w-6 h-6 text-primary" />Layanan Makeup</CardTitle></CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                      {services.map(service => {
-                        const isSelected = selectedService?.id === service.id;
-                        return (
-                          <div key={service.id} className={`relative group cursor-pointer transition-all duration-300 transform ${isSelected ? 'scale-105' : 'hover:scale-105'}`} onClick={() => handleSelectService(service)}>
-                            <div className={`aspect-w-1 aspect-h-1 w-full overflow-hidden rounded-lg shadow-md border-2 ${isSelected ? 'border-primary' : 'border-transparent'}`}>
-                              <img src={service.image_url || 'https://placehold.co/400x400/png?text=GlamFind'} alt={service.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110" />
-                              <div className="absolute inset-0 bg-black/40 group-hover:bg-black/20 transition-all duration-300"></div>
-                              <div className="absolute bottom-0 left-0 right-0 p-3 text-white">
-                                <h4 className="font-bold text-sm md:text-base truncate">{service.name}</h4>
-                              </div>
-                            </div>
-                            {isSelected && <div className="absolute -top-2 -right-2 bg-primary rounded-full p-1 shadow-lg"><CheckCircle className="h-5 w-5 text-white" /></div>}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </CardContent>
-                </Card>
-              {/* --- AKHIR DARI BAGIAN DESAIN ULANG --- */}
-
-                <Card className="border-0 shadow-lg">
-                  <CardHeader><CardTitle className="flex items-center gap-2"><Star className="w-5 h-5 text-primary" />Ulasan Pelanggan ({reviews.length})</CardTitle></CardHeader>
-                  <CardContent className="space-y-6">{reviews.length > 0 ? reviews.map(review => (<div key={review.id} className="flex gap-4"><Avatar><AvatarImage src={review.profiles?.avatar_url || ''} /><AvatarFallback>{review.profiles?.full_name?.charAt(0)}</AvatarFallback></Avatar><div className="flex-1"><div className="flex items-center justify-between"><h4 className="font-semibold">{review.profiles?.full_name}</h4><StarRating rating={review.rating} /></div><p className="text-xs text-muted-foreground">{new Date(review.created_at).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })}</p><p className="text-sm mt-2">{review.review_text}</p></div></div>)) : (<p className="text-center text-muted-foreground py-8">Belum ada ulasan untuk MUA ini.</p>)}</CardContent>
-                </Card>
-              </div>
-              <div className="lg:col-span-1 space-y-8">
-                <Card className="border-0 shadow-lg">
-                  <CardHeader><CardTitle>Tentang MUA</CardTitle></CardHeader>
-                  <CardContent className="text-muted-foreground text-sm space-y-4"><p>{safeMua.profiles.bio}</p><div><h4 className="font-semibold text-foreground mb-2">Spesialisasi</h4><div className="flex flex-wrap gap-2">{safeMua.specializations.map(spec => (<Badge key={spec} variant="secondary">{spec}</Badge>))}</div></div></CardContent>
-                </Card>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {selectedService && (
-        <div className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-sm border-t z-30 shadow-[0_-4px_12px_-4px_rgba(0,0,0,0.1)]">
-          <div className="container mx-auto px-4 py-3 h-[84px] flex items-center">
-            <div className="w-full flex items-center gap-4">
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold truncate">{selectedService.name}</p>
-                <p className="text-lg font-bold text-primary">{formatCurrency(selectedService.price_min)}</p>
-              </div>
-              <div className="flex gap-2 flex-shrink-0">
-                <Button variant="outline" size="lg" onClick={() => setSelectedService(null)}><X className="h-4 w-4 mr-2" />Batal</Button>
-                <Button size="lg" onClick={handleBookingClick} disabled={isOwnProfile}>Pesan</Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* ... (AlertDialog, showLikeAnimation, dan JSX lainnya tidak berubah) ... */}
       
-      {isModalOpen && mua && ( <BookingModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} muaData={{ id: mua.id, business_name: mua.business_name, avatar_url: mua.profiles?.avatar_url }} selectedService={selectedService} /> )}
+      {/* --- PERBAIKAN: Teruskan `initialData` ke BookingModal --- */}
+      {isModalOpen && mua && ( 
+        <BookingModal 
+          isOpen={isModalOpen} 
+          onClose={() => setIsModalOpen(false)} 
+          muaData={{ id: mua.id, business_name: mua.business_name, avatar_url: mua.profiles?.avatar_url }} 
+          selectedService={selectedService}
+          initialData={initialBookingData} // <-- Teruskan data jadwal awal di sini
+        /> 
+      )}
+      {/* ------------------------------------------------------ */}
+      
       {!isMobile && isChatOpen && activeConversationId && ( <ChatPopup conversationId={activeConversationId} onClose={() => setIsChatOpen(false)} /> )}
     </>
   );

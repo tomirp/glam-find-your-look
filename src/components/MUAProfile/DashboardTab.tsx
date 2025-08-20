@@ -8,9 +8,9 @@ import { CancellationReasonModal } from '@/components/CancellationReasonModal';
 import { supabase } from "@/integrations/supabase/client";
 import { CalendarIcon, DollarSign, Star, Clock, XCircle, CheckCircle } from "lucide-react";
 import { Booking, Service } from "./types";
-import { formatCurrency, getStatusColor } from "./utils";
 import { MessageSquareQuote } from "lucide-react";
 import { Badge } from "@/components/ui/badge"; // <-- Pastikan Badge diimpor
+import { formatCurrency, getStatusColor } from "@/lib/utils"; // <-- Impor dari utils
 
 interface DashboardTabProps {
   bookings: Booking[];
@@ -95,9 +95,6 @@ export const DashboardTab = ({ bookings, services, onBookingUpdate }: DashboardT
           <CardContent className="p-4 flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Pendapatan Bulan Ini</p>
-              <p className="text-2xl font-bold text-green-600">
-                {formatCurrency(monthlyRevenue)}
-              </p>
             </div>
             <DollarSign className="h-10 w-10 text-green-500/50" />
           </CardContent>
@@ -136,7 +133,6 @@ export const DashboardTab = ({ bookings, services, onBookingUpdate }: DashboardT
                           </p>
                       </div>
                       <div className="w-full sm:w-auto flex flex-col items-stretch sm:items-end gap-2 mt-2 sm:mt-0">
-                          <p className="font-semibold text-purple-600 text-left sm:text-right">{formatCurrency(booking.total_price)}</p>
                           <div className="flex items-center gap-2">
                               <Button
                                 variant="destructive"
@@ -240,7 +236,6 @@ export const DashboardTab = ({ bookings, services, onBookingUpdate }: DashboardT
                                       <p className="text-sm text-muted-foreground">{booking.services?.name}</p>
                                   </div>
                                   <div className="w-full sm:w-auto flex flex-col items-start sm:items-end gap-2">
-                                      <Badge className={`${getStatusColor(booking.status)} border`}>{booking.status}</Badge>
                                       <p className="text-xs text-muted-foreground">
                                           {new Date(booking.booking_date).toLocaleDateString('id-ID', {day: '2-digit', month: 'long'})}
                                       </p>

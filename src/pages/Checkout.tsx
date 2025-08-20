@@ -13,21 +13,23 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, Tag, ShieldCheck, LoaderCircle, Palette, Calendar as CalendarIcon, Clock } from "lucide-react";
+import { ArrowLeft, Tag, ShieldCheck, LoaderCircle, Palette, Calendar as CalendarIcon, Clock, Pencil } from "lucide-react";
 
 const formatCurrency = (amount: number) => new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(amount);
 
 const Checkout = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  // --- PERBAIKAN: Ambil 'profile' dan 'loading' dari AuthContext ---
+  const { user, profile, loading: authLoading } = useAuth();
   const { toast } = useToast();
 
   const { bookingData } = location.state || {};
-
-  const [profileId, setProfileId] = useState<string | null>(null);
-  const [loadingProfile, setLoadingProfile] = useState(true);
-  const [customerNotes, setCustomerNotes] = useState('');
+  
+  // State yang tidak perlu lagi:
+  // const [profileId, setProfileId] = useState<string | null>(null);
+  // const [loadingProfile, setLoadingProfile] = useState(true);
+  const [customerNotes, setCustomerNotes] = useState(bookingData?.customerNotes || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const PLATFORM_FEE = 5000;
@@ -36,32 +38,27 @@ const Checkout = () => {
     if (!bookingData) {
       toast({ title: "Sesi Tidak Valid", description: "Data pemesanan tidak ditemukan.", variant: "destructive" });
       navigate('/');
-      return;
     }
+  }, [bookingData, toast, navigate]);
 
-    const fetchUserProfileId = async () => {
-      if (user) {
-        setLoadingProfile(true);
-        try {
-          const { data, error } = await supabase.from('profiles').select('id').eq('user_id', user.id).single();
-          if (error) throw error;
-          if (data) {
-            setProfileId(data.id);
-          } else {
-             toast({ title: "Profil Tidak Ditemukan", description: "Silakan coba login ulang.", variant: "destructive" });
-             navigate('/auth');
-          }
-        } catch (error) {
-          toast({ title: "Gagal Memuat Profil", variant: "destructive" });
-        } finally {
-          setLoadingProfile(false);
+  // useEffect untuk fetchUserProfileId tidak lagi diperlukan karena sudah ditangani oleh AuthContext
+
+  const handleChangeSchedule = () => {
+    navigate(`/mua/${bookingData.muaId}`, { 
+      state: { 
+        reopenBookingModal: true, 
+        service: {
+          id: bookingData.serviceId,
+          name: bookingData.serviceName,
+          price_min: bookingData.price,
+        },
+        initialData: {
+          date: bookingData.date,
+          time: bookingData.time,
         }
-      } else {
-        setLoadingProfile(false);
-      }
-    };
-    fetchUserProfileId();
-  }, [user, bookingData, toast, navigate]);
+      } 
+    });
+  };
 
   if (!bookingData) {
     return <div className="min-h-screen flex items-center justify-center">Mengalihkan...</div>;
@@ -71,7 +68,8 @@ const Checkout = () => {
   const totalPrice = servicePrice + PLATFORM_FEE;
 
   const handleConfirmAndPay = async () => {
-    if (!user || !profileId) {
+    // --- PERBAIKAN: Gunakan 'profile' langsung dari context ---
+    if (!user || !profile) {
       toast({ title: "Error", description: "Anda harus login untuk melanjutkan.", variant: "destructive" });
       return;
     }
@@ -92,9 +90,7 @@ const Checkout = () => {
         });
 
       if (error) {
-        // --- INI ADALAH BLOK YANG DIPERBARUI ---
-        // Memeriksa pesan error spesifik dari database
-        if (error.message.includes('Jadwal pada tanggal dan waktu ini tidak tersedia')) {
+        if (error.message.includes('Jadwal pada tanggal dan waktu ini tidak tersedia') || error.message.includes('Jadwal ini baru saja dipesan')) {
             toast({
                 title: "Jadwal Tidak Tersedia",
                 description: "Maaf, slot waktu yang Anda pilih baru saja dipesan. Silakan kembali untuk memilih jadwal lain.",
@@ -102,14 +98,12 @@ const Checkout = () => {
                 duration: 7000,
             });
         } else {
-            // Menampilkan pesan error umum jika masalahnya berbeda
             toast({
                 title: "Gagal Membuat Pesanan",
                 description: "Terjadi kesalahan: " + error.message,
                 variant: "destructive"
             });
         }
-        // -----------------------------------------
       } else if (!data) {
         throw new Error("Gagal mendapatkan Payment ID setelah pembuatan.");
       } else {
@@ -118,7 +112,6 @@ const Checkout = () => {
       }
 
     } catch (error: any) {
-       // Blok catch ini sekarang hanya untuk error yang tidak terduga, bukan dari RPC
        toast({ title: "Gagal Membuat Pesanan", description: "Terjadi kesalahan tak terduga. Coba lagi nanti.", variant: "destructive" });
     } finally {
       setIsSubmitting(false);
@@ -151,8 +144,27 @@ const Checkout = () => {
               </CardHeader>
               <CardContent className="space-y-4 pt-4">
                 <div className="flex items-center gap-4 text-sm"><Palette className="h-5 w-5 text-primary" /><span className="font-semibold">{bookingData.serviceName}</span></div>
-                <div className="flex items-center gap-4 text-sm"><CalendarIcon className="h-5 w-5 text-primary" /><span className="font-semibold">{format(new Date(bookingData.date), 'EEEE, d MMMM yyyy', { locale: indonesiaLocale })}</span></div>
-                <div className="flex items-center gap-4 text-sm"><Clock className="h-5 w-5 text-primary" /><span className="font-semibold">{bookingData.time}</span></div>
+                
+                <div className="flex justify-between items-center text-sm">
+                  <div className="flex items-center gap-4">
+                    <CalendarIcon className="h-5 w-5 text-primary" />
+                    <span className="font-semibold">{format(new Date(bookingData.date), 'EEEE, d MMMM yyyy', { locale: indonesiaLocale })}</span>
+                  </div>
+                  <Button variant="link" size="sm" onClick={handleChangeSchedule} className="h-auto p-0 text-xs">
+                    <Pencil className="h-3 w-3 mr-1" />
+                    Ubah
+                  </Button>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <div className="flex items-center gap-4">
+                    <Clock className="h-5 w-5 text-primary" />
+                    <span className="font-semibold">{bookingData.time}</span>
+                  </div>
+                   <Button variant="link" size="sm" onClick={handleChangeSchedule} className="h-auto p-0 text-xs">
+                    <Pencil className="h-3 w-3 mr-1" />
+                    Ubah
+                  </Button>
+                </div>
               </CardContent>
             </Card>
 
@@ -180,10 +192,12 @@ const Checkout = () => {
                 </div>
               </CardContent>
               <CardFooter>
-                <Button size="lg" className="w-full h-12 text-base" onClick={handleConfirmAndPay} disabled={isSubmitting || loadingProfile}>
+                {/* --- PERBAIKAN: Ganti 'loadingProfile' dengan 'authLoading' --- */}
+                <Button size="lg" className="w-full h-12 text-base" onClick={handleConfirmAndPay} disabled={isSubmitting || authLoading}>
                   {isSubmitting ? <LoaderCircle className="animate-spin h-5 w-5 mr-2" /> : <ShieldCheck className="h-5 w-5 mr-2" />}
                   {isSubmitting ? 'Memproses...' : 'Konfirmasi dan Bayar'}
                 </Button>
+                {/* ----------------------------------------------------------- */}
               </CardFooter>
             </Card>
           </div>
