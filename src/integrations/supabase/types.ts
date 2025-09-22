@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.12 (cd3cf9e)"
@@ -627,6 +627,27 @@ export type Database = {
           },
         ]
       }
+      user_roles: {
+        Row: {
+          created_at: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -634,22 +655,22 @@ export type Database = {
     Functions: {
       advanced_mua_search: {
         Args: {
-          p_query: string
-          p_min_price?: number
           p_max_price?: number
+          p_min_price?: number
           p_min_rating?: number
-          p_specializations?: string[]
+          p_query: string
           p_sort_by?: string
+          p_specializations?: string[]
         }
         Returns: {
-          id: string
           business_name: string
-          location_city: string
-          specializations: string[]
-          rating: number
-          total_reviews: number
           cover_image_url: string
+          id: string
+          location_city: string
           min_service_price: number
+          rating: number
+          specializations: string[]
+          total_reviews: number
         }[]
       }
       cancel_booking: {
@@ -658,8 +679,8 @@ export type Database = {
       }
       cancel_booking_by_customer: {
         Args:
+          | { cancellation_reason_param: string; p_booking_id: string }
           | { p_booking_id: string }
-          | { p_booking_id: string; cancellation_reason_param: string }
         Returns: undefined
       }
       complete_booking: {
@@ -671,27 +692,36 @@ export type Database = {
         Returns: boolean
       }
       confirm_portfolio_verification: {
-        Args: { p_token: string; p_status: string; p_message?: string }
+        Args: { p_message?: string; p_status: string; p_token: string }
         Returns: Json
       }
       create_new_booking: {
         Args:
           | {
-              p_mua_profile_id: string
-              p_service_id: string
               p_booking_date: string
               p_booking_time: string
+              p_customer_id: string
+              p_mua_id: string
+              p_notes: string
+              p_service_id: string
               p_total_price: number
-              p_platform_fee: number
             }
           | {
-              p_mua_profile_id: string
-              p_service_id: string
               p_booking_date: string
               p_booking_time: string
-              p_total_price: number
+              p_customer_notes: string
+              p_mua_profile_id: string
               p_platform_fee: number
-              p_customer_notes?: string
+              p_service_id: string
+              p_total_price: number
+            }
+          | {
+              p_booking_date: string
+              p_booking_time: string
+              p_mua_profile_id: string
+              p_platform_fee: number
+              p_service_id: string
+              p_total_price: number
             }
         Returns: string
       }
@@ -699,6 +729,16 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: {
           specialization: string
+        }[]
+      }
+      get_business_listings: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          avatar_url: string
+          business_name: string
+          full_name: string
+          id: string
+          location_city: string
         }[]
       }
       get_customer_conversations: {
@@ -715,16 +755,28 @@ export type Database = {
           profiles: Json
         }[]
       }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_admin: {
+        Args: { _user_id?: string }
+        Returns: boolean
+      }
       update_booking_status_by_mua: {
         Args: {
+          cancellation_reason_param?: string
           p_booking_id: string
           p_new_status: Database["public"]["Enums"]["booking_status"]
-          cancellation_reason_param?: string
         }
         Returns: undefined
       }
     }
     Enums: {
+      app_role: "admin" | "mua" | "customer"
       booking_status:
         | "pending"
         | "accepted"
@@ -861,6 +913,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      app_role: ["admin", "mua", "customer"],
       booking_status: [
         "pending",
         "accepted",
