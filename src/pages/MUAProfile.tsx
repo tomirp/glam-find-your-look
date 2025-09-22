@@ -52,7 +52,7 @@ const MUAProfile = () => {
     if (!user) return;
     setPageLoading(true);
     try {
-      const { data: profile, error: profileError } = await supabase.from('profiles').select('id, full_name, phone, avatar_url, bio').eq('user_id', user.id).single();
+      const { data: profile, error: profileError } = await supabase.from('profiles').select('id, full_name, phone, avatar_url, bio').eq('user_id', user.id).single() as { data: UserProfile | null, error: any };
       if (profileError) throw new Error("Gagal mengambil profil pengguna.");
       setUserProfile(profile);
 
