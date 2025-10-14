@@ -7,7 +7,7 @@ import { LoaderCircle } from 'lucide-react';
 interface CancellationReasonModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (reason: string) => Promise<void>;
+  onSubmit: (reason: string) => void;
   title: string;
   description: string;
 }
@@ -16,13 +16,13 @@ export const CancellationReasonModal = ({ isOpen, onClose, onSubmit, title, desc
   const [reason, setReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = async () => {
+  const handleSubmit = () => {
     if (!reason) return;
     setIsSubmitting(true);
-    await onSubmit(reason);
+    onSubmit(reason);
+    setReason('');
     setIsSubmitting(false);
     onClose();
-    setReason(''); // Kosongkan textarea setelah submit
   };
 
   const handleClose = () => {

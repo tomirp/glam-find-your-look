@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 
 const AdminSeed = () => {
   const [loading, setLoading] = useState(false);
+  const [setupLoading, setSetupLoading] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -20,6 +21,19 @@ const AdminSeed = () => {
       toast({ title: 'Seeding gagal', description: e?.message ?? String(e), variant: 'destructive' });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const setupMUAData = async () => {
+    try {
+      setSetupLoading(true);
+      const { data, error } = await supabase.functions.invoke('setup-mua-data', { method: 'POST', body: {} });
+      if (error) throw error;
+      toast({ title: 'Setup berhasil', description: 'Data MUA kegiatanpus02@gmail.com telah disetup dengan 5 layanan' });
+    } catch (e: any) {
+      toast({ title: 'Setup gagal', description: e?.message ?? String(e), variant: 'destructive' });
+    } finally {
+      setSetupLoading(false);
     }
   };
 
@@ -45,11 +59,21 @@ const AdminSeed = () => {
         <CardHeader>
           <CardTitle>Admin: Seed MUA Dummy</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <p>Tekan tombol di bawah untuk membuat 6 akun MUA dummy dan mengisi layanan yang belum ada di Jakarta/Bandung.</p>
-          <Button onClick={runSeeding} disabled={loading}>
-            {loading ? 'Memproses...' : 'Jalankan Seeding Sekarang'}
-          </Button>
+        <CardContent className="space-y-6">
+          <div className="space-y-4">
+            <p>Tekan tombol di bawah untuk membuat 6 akun MUA dummy dan mengisi layanan yang belum ada di Jakarta/Bandung.</p>
+            <Button onClick={runSeeding} disabled={loading || setupLoading}>
+              {loading ? 'Memproses...' : 'Jalankan Seeding Sekarang'}
+            </Button>
+          </div>
+          
+          <div className="pt-4 border-t space-y-4">
+            <p className="font-semibold">Setup layanan untuk kegiatanpus02@gmail.com:</p>
+            <p className="text-sm text-muted-foreground">Melengkapi profil dan menambahkan 5 layanan makeup untuk akun ini.</p>
+            <Button onClick={setupMUAData} disabled={setupLoading || loading} variant="secondary">
+              {setupLoading ? 'Memproses...' : 'Setup Data MUA (kegiatanpus02)'}
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </main>

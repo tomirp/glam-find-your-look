@@ -210,9 +210,7 @@ const Activity = () => {
             </div>
             <CancellationReasonModal
                 isOpen={isCancelModalOpen}
-                // --- PERBAIKAN DI SINI: Tambahkan 'async' ---
-                onSubmit={async (reason) => cancelBooking(reason)}
-                // ---------------------------------------------
+                onSubmit={(reason) => cancelBooking(reason)}
                 onClose={() => setCancelModalOpen(false)}
                 title="Batalkan Pesanan"
                 description="Harap berikan alasan singkat mengapa Anda membatalkan pesanan ini."
