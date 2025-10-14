@@ -755,6 +755,48 @@ export type Database = {
           profiles: Json
         }[]
       }
+      get_public_mua_profile: {
+        Args: { p_profile_id: string }
+        Returns: {
+          business_name: string
+          cover_image_url: string
+          created_at: string
+          experience_years: number
+          id: string
+          is_available: boolean
+          location_address: string
+          location_city: string
+          portfolio_images: string[]
+          rating: number
+          specializations: string[]
+          total_bookings: number
+          total_reviews: number
+          updated_at: string
+          vehicle_availability: Database["public"]["Enums"]["vehicle_type"]
+          verified_portfolio_images: Json
+        }[]
+      }
+      get_public_mua_profiles: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          business_name: string
+          cover_image_url: string
+          created_at: string
+          experience_years: number
+          id: string
+          is_available: boolean
+          location_address: string
+          location_city: string
+          portfolio_images: string[]
+          rating: number
+          specializations: string[]
+          total_bookings: number
+          total_reviews: number
+          updated_at: string
+          vehicle_availability: Database["public"]["Enums"]["vehicle_type"]
+          verified_portfolio_images: Json
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -764,6 +806,10 @@ export type Database = {
       }
       is_admin: {
         Args: { _user_id?: string }
+        Returns: boolean
+      }
+      is_mua_owner: {
+        Args: { p_mua_profile_id: string }
         Returns: boolean
       }
       update_booking_status_by_mua: {

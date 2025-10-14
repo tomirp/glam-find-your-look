@@ -35,24 +35,43 @@ const NearbyMUASection = () => {
   useEffect(() => {
     const fetchNearbyMUAs = async () => {
       setLoading(true);
-      const { data, error } = await supabase
-        .from("mua_profiles")
-        .select(`id, business_name, rating, total_reviews, location_city, specializations, cover_image_url, services(price_min)`)
-        .or('location_city.ilike.Jakarta%,location_city.ilike.Bandung%')
-        .limit(4);
-
-      if (error) {
-        console.error("Error fetching nearby MUAs:", error);
+      
+      // Use secure function to get public MUA profiles
+      const { data: muaData, error: muaError } = await supabase.rpc('get_public_mua_profiles');
+      
+      if (muaError) {
+        console.error("Error fetching nearby MUAs:", muaError);
         setNearbyMUAs([]);
-      } else {
-        const processedData = (data as MUAProfileWithServices[]).map((mua) => ({
-            ...mua,
-            price_range: formatPriceRange(mua.services)
-        }));
-        setNearbyMUAs(processedData);
+        setLoading(false);
+        return;
       }
+
+      // Filter for Jakarta/Bandung and limit to 4
+      const filteredMuas = (muaData || [])
+        .filter(mua => mua.location_city?.toLowerCase().includes('jakarta') || 
+                       mua.location_city?.toLowerCase().includes('bandung'))
+        .slice(0, 4);
+
+      // Fetch services for each MUA
+      const muasWithServices = await Promise.all(
+        filteredMuas.map(async (mua) => {
+          const { data: services } = await supabase
+            .from('services')
+            .select('price_min')
+            .eq('mua_profile_id', mua.id);
+          return { ...mua, services: services || [] };
+        })
+      );
+
+      const processedData = muasWithServices.map((mua) => ({
+        ...mua,
+        price_range: formatPriceRange(mua.services)
+      }));
+      
+      setNearbyMUAs(processedData);
       setLoading(false);
     };
+    
     fetchNearbyMUAs();
   }, []);
 

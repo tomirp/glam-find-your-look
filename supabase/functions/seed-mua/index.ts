@@ -261,13 +261,14 @@ serve(async (req) => {
     return new Response(JSON.stringify({ success: false, error: 'Invalid token' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 
-  const email = userData.user.email.toLowerCase();
-  const ADMIN_WHITELIST = [
-    // Tambahkan email admin yang diizinkan memanggil fungsi ini
-    // "admin@yourdomain.com",
-  ];
-  if (!ADMIN_WHITELIST.includes(email)) {
-    return new Response(JSON.stringify({ success: false, error: 'Forbidden' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  // Check if user is admin using database role
+  const { data: isAdminData, error: adminError } = await userClient.rpc('is_admin');
+  if (adminError || !isAdminData) {
+    console.error('Admin check error:', adminError);
+    return new Response(JSON.stringify({ success: false, error: 'Forbidden: Only admin can run seeding' }), { 
+      status: 403, 
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+    });
   }
 
   try {

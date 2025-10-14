@@ -1,13 +1,41 @@
 // src/components/AdminRoute.tsx
 import { Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { ADMIN_EMAIL_WHITELIST } from "@/config/admin";
 import { LoadingSpinner } from "./LoadingSpinner";
+import { supabase } from "@/integrations/supabase/client";
+import { useEffect, useState } from "react";
 
 const AdminRoute = () => {
   const { user, loading } = useAuth();
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  const [checking, setChecking] = useState(true);
 
-  if (loading) {
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      if (!user) {
+        setIsAdmin(false);
+        setChecking(false);
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase.rpc('is_admin');
+        if (error) throw error;
+        setIsAdmin(data === true);
+      } catch (error) {
+        console.error('Error checking admin status:', error);
+        setIsAdmin(false);
+      } finally {
+        setChecking(false);
+      }
+    };
+
+    if (!loading) {
+      checkAdminStatus();
+    }
+  }, [user, loading]);
+
+  if (loading || checking) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <LoadingSpinner size="lg" />
@@ -15,13 +43,8 @@ const AdminRoute = () => {
     );
   }
 
-  if (!user) {
+  if (!user || !isAdmin) {
     return <Navigate to="/auth" replace />;
-  }
-
-  const isAdmin = !!user.email && ADMIN_EMAIL_WHITELIST.includes(user.email.toLowerCase());
-  if (!isAdmin) {
-    return <Navigate to="/" replace />;
   }
 
   return <Outlet />;

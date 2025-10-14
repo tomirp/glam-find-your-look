@@ -63,12 +63,9 @@ const ChatPopup = ({ conversationId, onClose }: ChatPopupProps) => {
           
           if (profileError) throw profileError;
           
-          // Coba ambil business_name dari mua_profiles jika ada
-          const { data: muaData } = await supabase
-            .from('mua_profiles')
-            .select('business_name')
-            .eq('profile_id', otherUserId)
-            .single();
+          // Coba ambil business_name dari mua_profiles menggunakan secure function
+          const { data: muaProfiles } = await supabase.rpc('get_public_mua_profiles');
+          const muaData = muaProfiles?.find(m => m.id === otherUserId);
           
           setOtherParticipant({
             ...profileData,

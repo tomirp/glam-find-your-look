@@ -14,15 +14,34 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { User, LogOut } from "lucide-react";
 import NotificationBell from "./NotificationBell";
-import { useToast } from "@/hooks/use-toast"; // <-- 1. Impor useToast
-import { ADMIN_EMAIL_WHITELIST } from "@/config/admin";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useState, useEffect } from "react";
 
 const Navbar = () => {
   const { user, role, signOut } = useAuth();
   const navigate = useNavigate();
-  const { toast } = useToast(); // <-- 2. Inisialisasi hook toast
+  const { toast } = useToast();
+  const [isAdmin, setIsAdmin] = useState(false);
 
-  const isAdmin = !!user?.email && ADMIN_EMAIL_WHITELIST.includes(user.email.toLowerCase());
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      if (!user) {
+        setIsAdmin(false);
+        return;
+      }
+      
+      try {
+        const { data } = await supabase.rpc('is_admin');
+        setIsAdmin(data === true);
+      } catch (error) {
+        console.error('Error checking admin status:', error);
+        setIsAdmin(false);
+      }
+    };
+
+    checkAdminStatus();
+  }, [user]);
 
   const handleSignOut = async () => {
     try {

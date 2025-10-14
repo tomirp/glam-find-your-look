@@ -35,25 +35,44 @@ const PopularMUASection = () => {
   useEffect(() => {
     const fetchPopularMUAs = async () => {
       setLoading(true);
-      const { data, error } = await supabase
-        .from("mua_profiles")
-        .select(`id, business_name, rating, total_reviews, location_city, specializations, cover_image_url, services(price_min)`)
-        .or('location_city.ilike.Jakarta%,location_city.ilike.Bandung%')
-        .order('rating', { ascending: false, nullsFirst: false })
-        .limit(4);
-
-      if (error) {
-        console.error("Error fetching popular MUAs:", error);
+      
+      // Use secure function to get public MUA profiles
+      const { data: muaData, error: muaError } = await supabase.rpc('get_public_mua_profiles');
+      
+      if (muaError) {
+        console.error("Error fetching popular MUAs:", muaError);
         setPopularMUAs([]);
-      } else {
-        const processedData = (data as MUAProfileWithServices[]).map((mua) => ({
-            ...mua,
-            price_range: formatPriceRange(mua.services)
-        }));
-        setPopularMUAs(processedData);
+        setLoading(false);
+        return;
       }
+
+      // Filter, sort and limit
+      const filteredMuas = (muaData || [])
+        .filter(mua => mua.location_city?.toLowerCase().includes('jakarta') || 
+                       mua.location_city?.toLowerCase().includes('bandung'))
+        .sort((a, b) => (b.rating || 0) - (a.rating || 0))
+        .slice(0, 4);
+
+      // Fetch services for each MUA
+      const muasWithServices = await Promise.all(
+        filteredMuas.map(async (mua) => {
+          const { data: services } = await supabase
+            .from('services')
+            .select('price_min')
+            .eq('mua_profile_id', mua.id);
+          return { ...mua, services: services || [] };
+        })
+      );
+
+      const processedData = muasWithServices.map((mua) => ({
+        ...mua,
+        price_range: formatPriceRange(mua.services)
+      }));
+      
+      setPopularMUAs(processedData);
       setLoading(false);
     };
+    
     fetchPopularMUAs();
   }, []);
 
